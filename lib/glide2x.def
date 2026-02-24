@@ -1,0 +1,17 @@
+; Glide 2.x import library definition
+; Used by dlltool to generate libglide2x.a
+; -k strips @N decorations for DLL lookup.
+
+LIBRARY glide2x.dll
+EXPORTS
+    grGlideInit@0
+    grGlideShutdown@0
+    grSstSelect@4
+    grSstWinOpen@28
+    grColorCombine@20
+    grDepthBufferMode@4
+    grCullMode@4
+    grBufferClear@12
+    grBufferSwap@4
+    grDrawTriangle@12
+    grRenderBuffer@4

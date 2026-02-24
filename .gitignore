@@ -1,0 +1,38 @@
+# Build output
+build/
+build-win32/
+
+# Cache
+.cache/
+
+# Specs (private reference material)
+mock/
+specs/
+TODO.md
+spec-draft/
+ISSUES_LOG.md
+
+# Internal docs
+src-compilation.md
+features/
+lawmaker.pdf
+
+# IDE / Editor
+.vscode/
+.cursor/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled objects
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
