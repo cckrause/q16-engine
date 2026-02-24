@@ -1,6 +1,6 @@
 # q16 Engine
 
-A feature-complete reimplementation of the **Jedi Engine** — the 2.5D portal engine behind *Star Wars: Dark Forces* (1995) — written from scratch in **pure C99**.
+A feature-complete reimplementation of the **Jedi Engine** — the 2.5D portal engine behind *Star Wars: Dark Forces*™ (1995) — written from scratch in **pure C99**.
 
 The goal: build the entire engine from the ground up based on reverse-engineered specifications, targeting **3dfx Glide on Windows 98** with real Voodoo hardware. No OpenGL, no DirectX, no modern abstractions. Just Glide, fixed-point math, and manual memory management.
 
@@ -176,6 +176,10 @@ lib/
 cmake/              MinGW cross-compilation toolchain
 specs/              Reverse-engineered Jedi Engine specifications
 ```
+
+## Trademarks
+
+*Star Wars*, *Dark Forces*, and the Jedi Engine are trademarks or registered trademarks of Lucasfilm Ltd. and/or The Walt Disney Company. This project is not affiliated with or endorsed by Lucasfilm or Disney.
 
 ## Licence
 
