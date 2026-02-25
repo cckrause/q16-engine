@@ -6,6 +6,12 @@ The goal: build the entire engine from the ground up based on reverse-engineered
 
 This is an educational and entertainment project. A deep dive into C programming, retro 3D rendering, and the kind of engine architecture that powered mid-90s shooters before hardware-accelerated GPUs took over.
 
+## Status
+
+The CPU render pipeline is complete: portal-based sector traversal, frustum culling, wall clipping, S-buffer occlusion, lighting, display list generation, and object sorting. Full adjoin (portal) support allows seamless traversal between connected sectors. The wireframe level viewer renders full Dark Forces levels in real time — and also loads and renders *Outlaws*™ (1997) levels, since both games share the Jedi Engine's portal-based level format.
+
+527 tests across 20 suites, all passing.
+
 ## Target Platform
 
 | Component | Target |
@@ -90,12 +96,6 @@ These tools run natively on macOS/Linux and are used for development, debugging,
 | `q16_dev` | **Dev harness.** Console-based entry point for testing engine subsystems without a window. |
 | `q16_engine` | **Glide 2.x test harness.** Win32 cross-compiled target. Runtime DLL loading of `glide2x.dll`, fullscreen 640x480 rendering, rotating lit quad with software transforms. |
 
-## Status
-
-The CPU render pipeline is complete: portal-based sector traversal, frustum culling, wall clipping, S-buffer occlusion, lighting, display list generation, and object sorting. The wireframe level viewer renders full Dark Forces levels in real time.
-
-527 tests across 20 suites, all passing.
-
 ### Not Yet Implemented
 
 - Asset loading (BM textures, WAX sprites, 3DO models, VOC sounds, PAL/CMP palettes)
@@ -175,11 +175,12 @@ lib/
   glide2x.def       Glide 2.x import library definition
 cmake/              MinGW cross-compilation toolchain
 specs/              Reverse-engineered Jedi Engine specifications
+ISSUES_LOG/         Known issues and root-cause analyses (in-repo tracker, no external tools)
 ```
 
 ## Trademarks
 
-*Star Wars*, *Dark Forces*, and the Jedi Engine are trademarks or registered trademarks of Lucasfilm Ltd. and/or The Walt Disney Company. This project is not affiliated with or endorsed by Lucasfilm or Disney.
+*Star Wars*, *Dark Forces*, *Outlaws*, and the Jedi Engine are trademarks or registered trademarks of Lucasfilm Ltd. and/or The Walt Disney Company. This project is not affiliated with or endorsed by Lucasfilm or Disney.
 
 ## Licence
 

@@ -1,4 +1,4 @@
-# Force Engine - C99 code style
+# q16 Engine - C99 code style
 # Based on LLVM style with adjustments to match existing codebase.
 
 BasedOnStyle: LLVM
