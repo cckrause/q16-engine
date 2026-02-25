@@ -176,9 +176,9 @@ static void emit_wall_entries(RenderState *rs, const WallSegment *seg,
   // Transparent mid-texture (adjoin with WF1_ADJ_MID_TEX): drawn in
   // transparent pass AFTER adjoin recursion.
   if (seg->is_adjoin && (w->flags1 & WF1_ADJ_MID_TEX)) {
-    // Opening bounds: max of floors → min of ceilings.
-    float open_bot = floor_h > next_floor ? floor_h : next_floor;
-    float open_top = ceil_h < next_ceil ? ceil_h : next_ceil;
+    // Opening bounds (Y-down): tighter floor = min, tighter ceiling = max.
+    float open_bot = floor_h < next_floor ? floor_h : next_floor;
+    float open_top = ceil_h > next_ceil ? ceil_h : next_ceil;
     entry.pos.y_bot = open_bot;
     entry.pos.y_top = open_top;
     entry.data.flags_part = display_list_pack_flags(
