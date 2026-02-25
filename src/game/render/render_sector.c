@@ -375,20 +375,8 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
   for (int32_t i = 0; i < adjoin_list.count; i++) {
     AdjoinEntry *ae = &adjoin_list.entries[i];
 
-    // Save state.
-    AdjoinSaveState save;
-    adjoin_save_state(&save, rs->window.min_x, rs->window.max_x, rs->window.min_y,
-                      rs->window.max_y, ambient, ambient * 0.875f);
-
-    // Enter adjoin.
-    render_window_enter_adjoin(&rs->window, ae->edge_pair.x0, ae->edge_pair.x1);
-    depth_buffer_enter_adjoin(&rs->depth, ae->edge_pair.x0, ae->edge_pair.x1);
-    rs->adjoin_depth++;
-
-    // Build a child frustum from the full portal wall extent.
     // Re-transform the original wall vertices (not the frustum-clipped segment
     // vertices) so the frustum represents the actual angular opening.
-    Frustum portal_frustum;
     float pw0x, pw0z, pw1x, pw1z;
     camera_transform_vertex_xz(&rs->camera, fixed16_to_float(ae->seg->src_wall->w0->x),
                                fixed16_to_float(ae->seg->src_wall->w0->z), &pw0x, &pw0z);
@@ -399,12 +387,25 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
       fprintf(stderr, "    portal→sec %d  raw cam-space v0=(%.3f,%.3f) v1=(%.3f,%.3f)\n",
               ae->next_sector->id, pw0x, pw0z, pw1x, pw1z);
 
-    frustum_clip_near(&pw0x, &pw0z, &pw1x, &pw1z, NEAR_PLANE_EPSILON, NULL);
+    if (!frustum_clip_near(&pw0x, &pw0z, &pw1x, &pw1z, NEAR_PLANE_EPSILON, NULL))
+      continue;
 
     if (trace)
       fprintf(stderr,
               "    portal→sec %d  after near-clip v0=(%.3f,%.3f) v1=(%.3f,%.3f)\n",
               ae->next_sector->id, pw0x, pw0z, pw1x, pw1z);
+
+    // Save state.
+    AdjoinSaveState save;
+    adjoin_save_state(&save, rs->window.min_x, rs->window.max_x, rs->window.min_y,
+                      rs->window.max_y, ambient, ambient * 0.875f);
+
+    // Enter adjoin.
+    render_window_enter_adjoin(&rs->window, ae->edge_pair.x0, ae->edge_pair.x1);
+    depth_buffer_enter_adjoin(&rs->depth, ae->edge_pair.x0, ae->edge_pair.x1);
+    rs->adjoin_depth++;
+
+    Frustum portal_frustum;
 
     float pvx[2] = {pw0x, pw1x};
     float pvz[2] = {pw0z, pw1z};
