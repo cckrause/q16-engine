@@ -36,6 +36,9 @@ bool render_state_init(RenderState *rs, int32_t screen_width, int32_t screen_hei
   rs->draw_frame = 0;
   rs->adjoin_depth = 0;
   rs->max_adjoin_depth = max_adjoin_depth;
+  rs->portals_traversed = 0;
+  rs->max_portals = 4096;
+  rs->cull_mask = CULL_ALL;
   rs->visited_sectors = NULL;
   rs->visited_capacity = 0;
   return true;
@@ -66,6 +69,12 @@ void render_state_reset(RenderState *rs) {
   flat_reset(&rs->flat, rs->camera.screen_height);
   display_list_reset(&rs->display_list);
   rs->adjoin_depth = 0;
+  rs->portals_traversed = 0;
+  rs->cull_count_backface = 0;
+  rs->cull_count_frustum = 0;
+  rs->cull_count_sbuffer = 0;
+  rs->cull_count_dfs = 0;
+  rs->cull_count_budget = 0;
   if (rs->visited_sectors && rs->visited_capacity > 0)
     memset(rs->visited_sectors, 0, (size_t)rs->visited_capacity * sizeof(bool));
 }
@@ -213,13 +222,17 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     return;
   }
 
-  // Double-draw prevention.
-  if (sector->prev_draw_frame == rs->draw_frame) {
+  if ((rs->cull_mask & CULL_PORTAL_BUDGET) && rs->portals_traversed >= rs->max_portals) {
+    rs->cull_count_budget++;
     if (trace)
-      fprintf(stderr, "  [SKIP] sec %d — already drawn this frame (depth %d)\n",
-              sector->id, rs->adjoin_depth);
+      fprintf(stderr, "  [SKIP] sec %d — portal budget exhausted (%d)\n", sector->id,
+              rs->portals_traversed);
     return;
   }
+
+  if (trace && sector->prev_draw_frame == rs->draw_frame)
+    fprintf(stderr, "  [RE-ENTER] sec %d  frustum_planes=%d\n", sector->id,
+            frustum ? frustum->plane_count : -1);
   sector->prev_draw_frame = rs->draw_frame;
 
   if (trace)
@@ -256,6 +269,14 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     Wall *wall = &sector->walls[i];
     int32_t wall_idx = sector->start_wall + i;
 
+    if ((rs->cull_mask & CULL_DFS_MARKING) && wall->traverse_frame == rs->draw_frame) {
+      rs->cull_count_dfs++;
+      if (trace && wall->next_sector)
+        fprintf(stderr, "    wall %d (→sec %d) SKIP dfs-marked\n", i,
+                wall->next_sector->id);
+      continue;
+    }
+
     float next_floor = 0.0f, next_ceil = 0.0f;
     if (wall->next_sector) {
       next_floor = fixed16_to_float(wall->next_sector->floor_height);
@@ -270,7 +291,7 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
 
     WallSegment *seg = &segments[seg_count];
     if (!wall_process(&rs->camera, frustum, wall, wall_idx, floor_h, ceil_h, next_floor,
-                      next_ceil, seg)) {
+                      next_ceil, seg, rs->cull_mask)) {
       if (trace && wall->next_sector)
         fprintf(stderr, "    wall %d (→sec %d) CULLED by wall_process\n", i,
                 wall->next_sector->id);
@@ -322,20 +343,73 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
       }
     }
 
-    // Portal walls are transparent windows — don't let them occlude
-    // geometry in the S-Buffer. Only insert solid walls.
-    if (seg->is_solid || !seg->is_adjoin) {
+    if ((rs->cull_mask & CULL_SBUFFER) && (seg->is_solid || !seg->is_adjoin)) {
       float proj0 = sbuffer_project(seg->vx0, seg->vz0);
       float proj1 = sbuffer_project(seg->vx1, seg->vz1);
       SBufferSeg *sb_seg =
-          sbuffer_insert(&rs->sbuffer, proj0, proj1, seg->normal_x, seg->normal_z,
-                         seg->normal_d, wall_idx, false, wall);
-      if (!sb_seg)
+          sbuffer_insert(&rs->sbuffer, proj0, proj1,
+                         seg->vx0, seg->vz0, seg->vx1, seg->vz1,
+                         seg->normal_x, seg->normal_z, seg->normal_d,
+                         wall_idx, false, wall);
+      if (!sb_seg) {
+        rs->cull_count_sbuffer++;
         continue;
+      }
     }
 
     if (!nowall) {
-      emit_wall_entries(rs, seg, ambient, sector_id);
+      if (wall->emit_frame != rs->draw_frame) {
+        int32_t op_before = rs->display_list.opaque_count;
+        int32_t tr_before = rs->display_list.transparent_count;
+        emit_wall_entries(rs, seg, ambient, sector_id);
+        wall->emit_frame = rs->draw_frame;
+        wall->emit_t0 = seg->t_clip0;
+        wall->emit_t1 = seg->t_clip1;
+        wall->emit_opaque_idx = op_before;
+        wall->emit_opaque_count = rs->display_list.opaque_count - op_before;
+        wall->emit_trans_idx = tr_before;
+        wall->emit_trans_count = rs->display_list.transparent_count - tr_before;
+      } else if (seg->t_clip0 < wall->emit_t0 || seg->t_clip1 > wall->emit_t1) {
+        float mt0 = seg->t_clip0 < wall->emit_t0 ? seg->t_clip0 : wall->emit_t0;
+        float mt1 = seg->t_clip1 > wall->emit_t1 ? seg->t_clip1 : wall->emit_t1;
+
+        float vx0_raw, vz0_raw, vx1_raw, vz1_raw;
+        camera_transform_vertex_xz(&rs->camera,
+                                   fixed16_to_float(wall->w0->x),
+                                   fixed16_to_float(wall->w0->z),
+                                   &vx0_raw, &vz0_raw);
+        camera_transform_vertex_xz(&rs->camera,
+                                   fixed16_to_float(wall->w1->x),
+                                   fixed16_to_float(wall->w1->z),
+                                   &vx1_raw, &vz1_raw);
+
+        float dx = vx1_raw - vx0_raw;
+        float dz = vz1_raw - vz0_raw;
+        float mvx0 = vx0_raw + mt0 * dx;
+        float mvz0 = vz0_raw + mt0 * dz;
+        float mvx1 = vx0_raw + mt1 * dx;
+        float mvz1 = vz0_raw + mt1 * dz;
+
+        for (int32_t k = 0; k < wall->emit_opaque_count; k++) {
+          DisplayListEntry *e =
+              &rs->display_list.opaque[wall->emit_opaque_idx + k];
+          e->pos.v0x = mvx0;
+          e->pos.v0z = mvz0;
+          e->pos.v1x = mvx1;
+          e->pos.v1z = mvz1;
+        }
+        for (int32_t k = 0; k < wall->emit_trans_count; k++) {
+          DisplayListEntry *e =
+              &rs->display_list.transparent[wall->emit_trans_idx + k];
+          e->pos.v0x = mvx0;
+          e->pos.v0z = mvz0;
+          e->pos.v1x = mvx1;
+          e->pos.v1z = mvz1;
+        }
+
+        wall->emit_t0 = mt0;
+        wall->emit_t1 = mt1;
+      }
     }
 
     // Queue visible portals for recursion.
@@ -371,53 +445,130 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
   // this array, and sorting would invalidate them. Display list entries are
   // already emitted during the wall loop above; the GPU handles draw order.
 
-  // Recurse through portals.
+  // Recurse through portals, merging multiple portals to the same target
+  // sector into a single wider frustum. Without merging, the first portal
+  // marks the sector as visited and subsequent portals are skipped, causing
+  // walls visible through the wider opening to be incorrectly culled.
+  bool adjoin_done[MAX_ADJOIN_SEG];
+  if (adjoin_list.count > 0)
+    memset(adjoin_done, 0, sizeof(bool) * (size_t)adjoin_list.count);
+
   for (int32_t i = 0; i < adjoin_list.count; i++) {
-    AdjoinEntry *ae = &adjoin_list.entries[i];
-
-    // Re-transform the original wall vertices (not the frustum-clipped segment
-    // vertices) so the frustum represents the actual angular opening.
-    float pw0x, pw0z, pw1x, pw1z;
-    camera_transform_vertex_xz(&rs->camera, fixed16_to_float(ae->seg->src_wall->w0->x),
-                               fixed16_to_float(ae->seg->src_wall->w0->z), &pw0x, &pw0z);
-    camera_transform_vertex_xz(&rs->camera, fixed16_to_float(ae->seg->src_wall->w1->x),
-                               fixed16_to_float(ae->seg->src_wall->w1->z), &pw1x, &pw1z);
-
-    if (trace)
-      fprintf(stderr, "    portal→sec %d  raw cam-space v0=(%.3f,%.3f) v1=(%.3f,%.3f)\n",
-              ae->next_sector->id, pw0x, pw0z, pw1x, pw1z);
-
-    if (!frustum_clip_near(&pw0x, &pw0z, &pw1x, &pw1z, NEAR_PLANE_EPSILON, NULL))
+    if (adjoin_done[i])
       continue;
 
-    if (trace)
-      fprintf(stderr,
-              "    portal→sec %d  after near-clip v0=(%.3f,%.3f) v1=(%.3f,%.3f)\n",
-              ae->next_sector->id, pw0x, pw0z, pw1x, pw1z);
+    AdjoinEntry *ae = &adjoin_list.entries[i];
+    Sector *target = ae->next_sector;
+
+    // Collect portal vertices from all walls adjoining to this target sector.
+    float portal_vx[64];
+    float portal_vz[64];
+    int32_t pv_count = 0;
+    int32_t merged_x0 = ae->edge_pair.x0;
+    int32_t merged_x1 = ae->edge_pair.x1;
+
+    Wall *merged_walls[32];
+    int32_t merged_wall_count = 0;
+
+    for (int32_t j = i; j < adjoin_list.count; j++) {
+      AdjoinEntry *aj = &adjoin_list.entries[j];
+      if (aj->next_sector != target)
+        continue;
+      adjoin_done[j] = true;
+
+      if (merged_wall_count < 32)
+        merged_walls[merged_wall_count++] = aj->seg->src_wall;
+
+      if (pv_count + 2 > 64)
+        continue;
+
+      // Use the frustum-clipped segment vertices so the child frustum
+      // never exceeds the parent's angular bounds. Using raw (unclipped)
+      // wall vertices would produce an oversized frustum when the wall
+      // extends far beyond the visible opening, wasting visit budget on
+      // sectors that contribute no visible geometry (e.g. 606↔609 cycle).
+      float pw0x = aj->seg->vx0, pw0z = aj->seg->vz0;
+      float pw1x = aj->seg->vx1, pw1z = aj->seg->vz1;
+
+      if (trace)
+        fprintf(stderr, "    portal→sec %d  clipped cam-space v0=(%.3f,%.3f) v1=(%.3f,%.3f)\n",
+                target->id, pw0x, pw0z, pw1x, pw1z);
+
+      if (!frustum_clip_near(&pw0x, &pw0z, &pw1x, &pw1z, NEAR_PLANE_EPSILON, NULL))
+        continue;
+
+      portal_vx[pv_count] = pw0x;
+      portal_vz[pv_count] = pw0z;
+      pv_count++;
+      portal_vx[pv_count] = pw1x;
+      portal_vz[pv_count] = pw1z;
+      pv_count++;
+
+      if (aj->edge_pair.x0 < merged_x0)
+        merged_x0 = aj->edge_pair.x0;
+      if (aj->edge_pair.x1 > merged_x1)
+        merged_x1 = aj->edge_pair.x1;
+    }
+
+    if (pv_count < 2)
+      continue;
+
+    // Build the portal frustum from the two outermost vertices (widest
+    // angular span as seen from the camera at the origin).
+    int32_t left_idx = 0, right_idx = 0;
+    float left_ratio = portal_vx[0] / portal_vz[0];
+    float right_ratio = left_ratio;
+    for (int32_t k = 1; k < pv_count; k++) {
+      float ratio = portal_vx[k] / portal_vz[k];
+      if (ratio < left_ratio) {
+        left_ratio = ratio;
+        left_idx = k;
+      }
+      if (ratio > right_ratio) {
+        right_ratio = ratio;
+        right_idx = k;
+      }
+    }
 
     // Save state.
     AdjoinSaveState save;
     adjoin_save_state(&save, rs->window.min_x, rs->window.max_x, rs->window.min_y,
                       rs->window.max_y, ambient, ambient * 0.875f);
 
-    // Enter adjoin.
-    render_window_enter_adjoin(&rs->window, ae->edge_pair.x0, ae->edge_pair.x1);
-    depth_buffer_enter_adjoin(&rs->depth, ae->edge_pair.x0, ae->edge_pair.x1);
+    // Enter adjoin with merged x range.
+    render_window_enter_adjoin(&rs->window, merged_x0, merged_x1);
+    depth_buffer_enter_adjoin(&rs->depth, merged_x0, merged_x1);
     rs->adjoin_depth++;
 
-    Frustum portal_frustum;
+    // DFS path marking: mark all merged portal walls before recursion
+    // so they are skipped if the child re-enters this sector.
+    for (int32_t m = 0; m < merged_wall_count; m++)
+      merged_walls[m]->traverse_frame = rs->draw_frame;
 
-    float pvx[2] = {pw0x, pw1x};
-    float pvz[2] = {pw0z, pw1z};
-    frustum_build_portal(&portal_frustum, pvx, pvz, 2);
+    rs->portals_traversed++;
 
-    if (trace)
-      fprintf(stderr, "    portal→sec %d  frustum planes=%d\n", ae->next_sector->id,
-              portal_frustum.plane_count);
+    if (rs->cull_mask & CULL_PORTAL_FRUSTUM) {
+      Frustum portal_frustum;
+      float pvx[2] = {portal_vx[left_idx], portal_vx[right_idx]};
+      float pvz[2] = {portal_vz[left_idx], portal_vz[right_idx]};
+      frustum_build_portal(&portal_frustum, pvx, pvz, 2);
 
-    frustum_stack_push(&rs->frustum_stack, &portal_frustum);
-    render_draw_sector(rs, ae->next_sector, frustum_stack_top(&rs->frustum_stack));
-    frustum_stack_pop(&rs->frustum_stack);
+      if (trace)
+        fprintf(stderr, "    portal→sec %d  frustum planes=%d\n", target->id,
+                portal_frustum.plane_count);
+
+      frustum_stack_push(&rs->frustum_stack, &portal_frustum);
+      render_draw_sector(rs, target, frustum_stack_top(&rs->frustum_stack));
+      frustum_stack_pop(&rs->frustum_stack);
+    } else {
+      if (trace)
+        fprintf(stderr, "    portal→sec %d  PORTAL_FRUSTUM OFF — using parent frustum\n",
+                target->id);
+      render_draw_sector(rs, target, frustum);
+    }
+
+    for (int32_t m = 0; m < merged_wall_count; m++)
+      merged_walls[m]->traverse_frame = 0;
 
     // Exit adjoin.
     rs->adjoin_depth--;
@@ -427,8 +578,7 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
 #else
     bool is_subsector = false;
 #endif
-    depth_buffer_exit_adjoin(&rs->depth, ae->edge_pair.x0, ae->edge_pair.x1,
-                             !is_subsector);
+    depth_buffer_exit_adjoin(&rs->depth, merged_x0, merged_x1, !is_subsector);
     render_window_exit_adjoin(&rs->window);
 
     // Restore state.

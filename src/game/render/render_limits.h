@@ -57,4 +57,16 @@
 #define PART_TOP_SIGN    8
 #define PART_BOT_SIGN    9
 
+// --- Debug: Culling Stage Toggles ------------------------------------------
+typedef enum {
+  CULL_BACKFACE = 1 << 0,
+  CULL_FRUSTUM = 1 << 1,
+  CULL_SBUFFER = 1 << 2,
+  CULL_DFS_MARKING = 1 << 3,
+  CULL_PORTAL_BUDGET = 1 << 4,
+  CULL_FRUSTUM_CLIP = 1 << 5,
+  CULL_PORTAL_FRUSTUM = 1 << 6,
+  CULL_ALL = 0x7F
+} CullFlag;
+
 #endif /* Q16_RENDER_LIMITS_H */

@@ -42,12 +42,29 @@ typedef struct {
   // Runtime-configurable maximum portal depth (default MAX_ADJOIN_DEPTH).
   int32_t max_adjoin_depth;
 
+  // Global portal traversal budget per frame. Counts total portal recursions;
+  // traversal stops when exhausted. Matches the reference GPU renderer pattern
+  // (s_maxPortals = 4096) instead of per-sector visit limits.
+  int32_t portals_traversed;
+  int32_t max_portals;
+
   // Per-frame visited-sector tracking (optional, allocated by caller).
   bool *visited_sectors;
   int32_t visited_capacity;
 
   // Single-frame debug trace: when true, log portal traversal to stderr.
   bool debug_trace;
+
+  // Debug: bitmask of active culling stages (default CULL_ALL).
+  // Toggle individual bits to bypass stages for debugging.
+  uint32_t cull_mask;
+
+  // Debug: per-stage cull counters (reset each frame).
+  int32_t cull_count_backface;
+  int32_t cull_count_frustum;
+  int32_t cull_count_sbuffer;
+  int32_t cull_count_dfs;
+  int32_t cull_count_budget;
 } RenderState;
 
 // Initialize all subsystems. Screen dimensions and limits must be known.

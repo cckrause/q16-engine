@@ -46,8 +46,8 @@ void test_adjoin(void) {
     memset(&seg, 0, sizeof(seg));
     seg.wall_x0 = 100;
     seg.wall_x1 = 200;
-    seg.z0 = 10.0f;
-    seg.z1 = 10.0f;
+    seg.vz0 = 10.0f;
+    seg.vz1 = 10.0f;
 
     EdgePair ep;
     adjoin_compute_edge_pair(100.0f, 100.0f, 0.0f,

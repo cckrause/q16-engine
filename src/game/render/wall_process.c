@@ -5,6 +5,7 @@
 // segments for S-Buffer insertion and display list emission.
 
 #include "render/wall_process.h"
+#include "render/render_limits.h"
 #include "world/flags.h"
 #include "world/sector.h"
 #include "world/wall.h"
@@ -32,25 +33,6 @@ static uint32_t wall_classify_adjoin(float floor_h, float ceil_h, float next_flo
   if (next_floor_h < floor_h)
     flags |= WDF_BOT;
   return flags;
-}
-
-// Depth interpolation
-
-static void wall_compute_depth_params(float sx0, float sz0, float sx1, float sz1,
-                                      int32_t screen_x0, int32_t screen_x1,
-                                      float *out_slope, float *out_numerator) {
-  int32_t dx = screen_x1 - screen_x0;
-  if (dx == 0) {
-    *out_slope = 0.0f;
-    *out_numerator = sz0;
-    return;
-  }
-
-  // Linear interpolation of 1/z across screen X.
-  float inv_z0 = 1.0f / sz0;
-  float inv_z1 = 1.0f / sz1;
-  *out_slope = (inv_z1 - inv_z0) / (float)dx;
-  *out_numerator = inv_z0;
 }
 
 // Texture U coordinate mapping
@@ -107,7 +89,7 @@ static void wall_compute_normal(float vx0, float vz0, float vx1, float vz1, floa
 
 bool wall_process(const CameraState *cam, const Frustum *frustum, Wall *wall,
                   int32_t wall_index, float floor_h, float ceil_h, float next_floor_h,
-                  float next_ceil_h, WallSegment *seg) {
+                  float next_ceil_h, WallSegment *seg, uint32_t cull_mask) {
   // Transform both wall vertices to view space.
   float vx0, vz0, vx1, vz1;
   camera_transform_vertex_xz(cam, fixed16_to_float(wall->w0->x),
@@ -115,10 +97,10 @@ bool wall_process(const CameraState *cam, const Frustum *frustum, Wall *wall,
   camera_transform_vertex_xz(cam, fixed16_to_float(wall->w1->x),
                              fixed16_to_float(wall->w1->z), &vx1, &vz1);
 
-  if (wall_is_backfacing(vx0, vz0, vx1, vz1))
+  if ((cull_mask & CULL_BACKFACE) && wall_is_backfacing(vx0, vz0, vx1, vz1))
     return false;
 
-  if (!frustum_test_segment(frustum, vx0, vz0, vx1, vz1))
+  if ((cull_mask & CULL_FRUSTUM) && !frustum_test_segment(frustum, vx0, vz0, vx1, vz1))
     return false;
 
   // Near-plane clip. Track parametric t for texture coordinate adjustment.
@@ -150,14 +132,15 @@ bool wall_process(const CameraState *cam, const Frustum *frustum, Wall *wall,
 
   // Frustum clip (left/right planes).
   float t0_frust = 0.0f, t1_frust = 1.0f;
-  if (!frustum_clip_segment(frustum, &cx0, &cz0, &cx1, &cz1, &t0_frust, &t1_frust))
-    return false;
+  if (cull_mask & CULL_FRUSTUM_CLIP) {
+    if (!frustum_clip_segment(frustum, &cx0, &cz0, &cx1, &cz1, &t0_frust, &t1_frust))
+      return false;
 
-  // Adjust parametric range for frustum clipping.
-  float range = t_clip1 - t_clip0;
-  float base = t_clip0;
-  t_clip0 = base + t0_frust * range;
-  t_clip1 = base + t1_frust * range;
+    float range = t_clip1 - t_clip0;
+    float base = t_clip0;
+    t_clip0 = base + t0_frust * range;
+    t_clip1 = base + t1_frust * range;
+  }
 
   // Project to screen X.
   float sx0 = camera_project_x(cam, cx0, cz0);
@@ -198,8 +181,6 @@ bool wall_process(const CameraState *cam, const Frustum *frustum, Wall *wall,
   seg->wall_index = wall_index;
   seg->wall_x0 = ix0;
   seg->wall_x1 = ix1;
-  seg->z0 = cz0;
-  seg->z1 = cz1;
   seg->vx0 = cx0;
   seg->vz0 = cz0;
   seg->vx1 = cx1;
@@ -207,12 +188,12 @@ bool wall_process(const CameraState *cam, const Frustum *frustum, Wall *wall,
 
   wall_compute_normal(cx0, cz0, cx1, cz1, &seg->normal_x, &seg->normal_z, &seg->normal_d);
 
+  seg->t_clip0 = t_clip0;
+  seg->t_clip1 = t_clip1;
+
   float texel_length = fixed16_to_float(wall->texel_length);
   wall_compute_texture_u(cx0, cz0, cx1, cz1, t_clip0, t_clip1, texel_length, ix0, ix1,
                          &seg->u_coord0, &seg->du_dx);
-
-  wall_compute_depth_params(cx0, cz0, cx1, cz1, ix0, ix1, &seg->depth_slope,
-                            &seg->depth_numerator);
 
   // Adjoin classification.
   seg->is_adjoin = (wall->next_sector != NULL);

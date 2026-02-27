@@ -19,7 +19,8 @@ typedef struct {
 // Sector
 // ===========================================================================
 // The central spatial container. Every point in the world belongs to exactly
-// one sector. Sectors are convex polygons connected by portal walls (adjoins).
+// one sector. Sectors are convex polygons connected by portal walls (adjoins and
+// dadjoins).
 struct Sector {
   // --- Identity ---
   int32_t id;
@@ -75,9 +76,8 @@ struct Sector {
   Vec2Fixed bounds_max;
 
   // --- Rendering ---
-  uint32_t prev_draw_frame;
-  uint32_t prev_draw_frame2;
-  uint32_t dirty_flags; // SectorDirtyFlag bitmask
+  uint32_t prev_draw_frame; // Debug for double-visit detection (same frame)
+  uint32_t dirty_flags;     // SectorDirtyFlag bitmask
 
   // --- INF ---
   Allocator *inf_link; // linked list of InfLink items (NULL if no INF)

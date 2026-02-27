@@ -555,6 +555,302 @@ void test_level_parser(void) {
     stream_close(&sr2);
   }
 
+  // TEST_ADJOIN level: 4 sectors exercising solid wall + 3 adjoin types
+  game_level_clear();
+  {
+    static const char *ADJOIN_LVT =
+        "LVT 1.1\n"
+        "LEVELNAME TEST_ADJOIN\n"
+        "VERSION 1.0\n"
+        "PALETTES 1\n"
+        "  PALETTE: OLPAL.PCX\n"
+        "CMAPS 1\n"
+        "  CMAP: OLPAL.CMP\n"
+        "MUSIC NONE.GMD\n"
+        "PARALLAX 1024.00 0.00\n"
+        "LIGHT SOURCE 0.0 0.0 0.0 0.0\n"
+        "SHADES 0\n"
+        "TEXTURES 3\n"
+        "  TEXTURE: WALL.PCX\n"
+        "  TEXTURE: FLOOR.PCX\n"
+        "  TEXTURE: CEIL.PCX\n"
+        "NUMSECTORS 6\n"
+        // Sector 0: left room (10x10), floor=0, ceil=10.
+        "SECTOR 0\n"
+        "  NAME room_left\n"
+        "  AMBIENT 20\n"
+        "  PALETTE 0\n  CMAP 0\n  VADJOIN -1\n"
+        "  FRICTION 1\n  GRAVITY -60\n  ELASTICITY 0.3\n"
+        "  VELOCITY 0 0 0\n  FLOOR SOUND NULL\n"
+        "  FLOOR Y 0.00 1 0.00 0.00 0\n"
+        "  CEILING Y 10.00 2 0.00 0.00 0\n"
+        "  F_OVERLAY -1 0.00 0.00 0\n  C_OVERLAY -1 0.00 0.00 0\n"
+        "  FLOOR OFFSETS 0\n  FLAGS 0 0\n"
+        "  SLOPEDFLOOR -1 -1 0\n  SLOPEDCEILING -1 -1 0\n"
+        "  LAYER 0\n"
+        "  VERTICES 8\n"
+        "    X: 0.00 Z: 0.00\n    X: 0.00 Z: 10.00\n"
+        "    X: 10.00 Z: 10.00\n    X: 10.00 Z: 8.00\n"
+        "    X: 10.00 Z: 6.00\n    X: 10.00 Z: 4.00\n"
+        "    X: 10.00 Z: 2.00\n    X: 10.00 Z: 0.00\n"
+        "  WALLS 8\n"
+        "    WALL: 0 V1: 0 V2: 1 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 1 V1: 1 V2: 2 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 2 V1: 2 V2: 3 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 4 MIRROR: 0 DADJOIN: 5 DMIRROR: 0 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 3 V1: 3 V2: 4 MID: -1 0.00 0.00 TOP: 0 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 3 MIRROR: 0 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 4 V1: 4 V2: 5 MID: -1 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: 0 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 2 MIRROR: 0 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 5 V1: 5 V2: 6 MID: -1 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 1 MIRROR: 0 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 6 V1: 6 V2: 7 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 7 V1: 7 V2: 0 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        // Sector 1: fully open adjoin (floor=0, ceil=10)
+        "SECTOR 1\n"
+        "  NAME room_open\n"
+        "  AMBIENT 20\n"
+        "  PALETTE 0\n  CMAP 0\n  VADJOIN -1\n"
+        "  FRICTION 1\n  GRAVITY -60\n  ELASTICITY 0.3\n"
+        "  VELOCITY 0 0 0\n  FLOOR SOUND NULL\n"
+        "  FLOOR Y 0.00 1 0.00 0.00 0\n"
+        "  CEILING Y 10.00 2 0.00 0.00 0\n"
+        "  F_OVERLAY -1 0.00 0.00 0\n  C_OVERLAY -1 0.00 0.00 0\n"
+        "  FLOOR OFFSETS 0\n  FLAGS 0 0\n"
+        "  SLOPEDFLOOR -1 -1 0\n  SLOPEDCEILING -1 -1 0\n"
+        "  LAYER 0\n"
+        "  VERTICES 4\n"
+        "    X: 10.00 Z: 2.00\n    X: 10.00 Z: 4.00\n"
+        "    X: 20.00 Z: 4.00\n    X: 20.00 Z: 2.00\n"
+        "  WALLS 4\n"
+        "    WALL: 0 V1: 0 V2: 1 MID: -1 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 0 MIRROR: 5 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 1 V1: 1 V2: 2 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 2 V1: 2 V2: 3 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 3 V1: 3 V2: 0 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        // Sector 2: half-open top (floor=5, ceil=10)
+        "SECTOR 2\n"
+        "  NAME room_half_top\n"
+        "  AMBIENT 20\n"
+        "  PALETTE 0\n  CMAP 0\n  VADJOIN -1\n"
+        "  FRICTION 1\n  GRAVITY -60\n  ELASTICITY 0.3\n"
+        "  VELOCITY 0 0 0\n  FLOOR SOUND NULL\n"
+        "  FLOOR Y 5.00 1 0.00 0.00 0\n"
+        "  CEILING Y 10.00 2 0.00 0.00 0\n"
+        "  F_OVERLAY -1 0.00 0.00 0\n  C_OVERLAY -1 0.00 0.00 0\n"
+        "  FLOOR OFFSETS 0\n  FLAGS 0 0\n"
+        "  SLOPEDFLOOR -1 -1 0\n  SLOPEDCEILING -1 -1 0\n"
+        "  LAYER 0\n"
+        "  VERTICES 4\n"
+        "    X: 10.00 Z: 4.00\n    X: 10.00 Z: 6.00\n"
+        "    X: 20.00 Z: 6.00\n    X: 20.00 Z: 4.00\n"
+        "  WALLS 4\n"
+        "    WALL: 0 V1: 0 V2: 1 MID: -1 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 0 MIRROR: 4 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 1 V1: 1 V2: 2 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 2 V1: 2 V2: 3 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 3 V1: 3 V2: 0 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        // Sector 3: open bottom (floor=0, ceil=5)
+        "SECTOR 3\n"
+        "  NAME room_open_bot\n"
+        "  AMBIENT 20\n"
+        "  PALETTE 0\n  CMAP 0\n  VADJOIN -1\n"
+        "  FRICTION 1\n  GRAVITY -60\n  ELASTICITY 0.3\n"
+        "  VELOCITY 0 0 0\n  FLOOR SOUND NULL\n"
+        "  FLOOR Y 0.00 1 0.00 0.00 0\n"
+        "  CEILING Y 5.00 2 0.00 0.00 0\n"
+        "  F_OVERLAY -1 0.00 0.00 0\n  C_OVERLAY -1 0.00 0.00 0\n"
+        "  FLOOR OFFSETS 0\n  FLAGS 0 0\n"
+        "  SLOPEDFLOOR -1 -1 0\n  SLOPEDCEILING -1 -1 0\n"
+        "  LAYER 0\n"
+        "  VERTICES 4\n"
+        "    X: 10.00 Z: 6.00\n    X: 10.00 Z: 8.00\n"
+        "    X: 20.00 Z: 8.00\n    X: 20.00 Z: 6.00\n"
+        "  WALLS 4\n"
+        "    WALL: 0 V1: 0 V2: 1 MID: -1 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 0 MIRROR: 3 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 1 V1: 1 V2: 2 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 2 V1: 2 V2: 3 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 3 V1: 3 V2: 0 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        // Sector 4: upper dadjoin portal (floor=7, ceil=10)
+        "SECTOR 4\n"
+        "  NAME room_dadj_upper\n"
+        "  AMBIENT 20\n"
+        "  PALETTE 0\n  CMAP 0\n  VADJOIN -1\n"
+        "  FRICTION 1\n  GRAVITY -60\n  ELASTICITY 0.3\n"
+        "  VELOCITY 0 0 0\n  FLOOR SOUND NULL\n"
+        "  FLOOR Y 7.00 1 0.00 0.00 0\n"
+        "  CEILING Y 10.00 2 0.00 0.00 0\n"
+        "  F_OVERLAY -1 0.00 0.00 0\n  C_OVERLAY -1 0.00 0.00 0\n"
+        "  FLOOR OFFSETS 0\n  FLAGS 0 0\n"
+        "  SLOPEDFLOOR -1 -1 0\n  SLOPEDCEILING -1 -1 0\n"
+        "  LAYER 0\n"
+        "  VERTICES 4\n"
+        "    X: 10.00 Z: 8.00\n    X: 10.00 Z: 10.00\n"
+        "    X: 20.00 Z: 10.00\n    X: 20.00 Z: 8.00\n"
+        "  WALLS 4\n"
+        "    WALL: 0 V1: 0 V2: 1 MID: -1 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 0 MIRROR: 2 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 1 V1: 1 V2: 2 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 2 V1: 2 V2: 3 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 3 V1: 3 V2: 0 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        // Sector 5: lower dadjoin portal (floor=0, ceil=3)
+        "SECTOR 5\n"
+        "  NAME room_dadj_lower\n"
+        "  AMBIENT 20\n"
+        "  PALETTE 0\n  CMAP 0\n  VADJOIN -1\n"
+        "  FRICTION 1\n  GRAVITY -60\n  ELASTICITY 0.3\n"
+        "  VELOCITY 0 0 0\n  FLOOR SOUND NULL\n"
+        "  FLOOR Y 0.00 1 0.00 0.00 0\n"
+        "  CEILING Y 3.00 2 0.00 0.00 0\n"
+        "  F_OVERLAY -1 0.00 0.00 0\n  C_OVERLAY -1 0.00 0.00 0\n"
+        "  FLOOR OFFSETS 0\n  FLAGS 0 0\n"
+        "  SLOPEDFLOOR -1 -1 0\n  SLOPEDCEILING -1 -1 0\n"
+        "  LAYER 0\n"
+        "  VERTICES 4\n"
+        "    X: 10.00 Z: 8.00\n    X: 10.00 Z: 10.00\n"
+        "    X: 20.00 Z: 10.00\n    X: 20.00 Z: 8.00\n"
+        "  WALLS 4\n"
+        "    WALL: 0 V1: 0 V2: 1 MID: -1 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: 0 MIRROR: 2 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 1 V1: 1 V2: 2 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 2 V1: 2 V2: 3 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n"
+        "    WALL: 3 V1: 3 V2: 0 MID: 0 0.00 0.00 TOP: -1 0.00 0.00 "
+        "BOT: -1 0.00 0.00 SIGN: -1 0.00 0.00 "
+        "ADJOIN: -1 MIRROR: -1 DADJOIN: -1 DMIRROR: -1 FLAGS: 0 0 LIGHT: 0\n";
+
+    StreamReader adj_sr =
+        stream_from_memory(ADJOIN_LVT, (int32_t)strlen(ADJOIN_LVT));
+    LevelState al;
+    bool adj_ok = level_load_geometry(&adj_sr, &al);
+    stream_close(&adj_sr);
+
+    TEST_CHECK("adjoin LVT parse succeeds", adj_ok);
+    if (adj_ok) {
+      TEST_CHECK("adj sector_count", al.sector_count == 6);
+      TEST_CHECK("adj total walls", al.wall_count == 28);
+      TEST_CHECK("adj total verts", al.vertex_count == 28);
+
+      // Sector 0: left room (10x10)
+      Sector *s0 = &al.sectors[0];
+      TEST_CHECK("adj s0 name", strcmp(s0->name, "room_left") == 0);
+      TEST_CHECK("adj s0 floor", s0->floor_height == FIXED(0));
+      TEST_CHECK("adj s0 ceil", s0->ceiling_height == float_to_fixed16(-10.0f));
+      TEST_CHECK("adj s0 walls", s0->wall_count == 8);
+      TEST_CHECK("adj s0 verts", s0->vertex_count == 8);
+
+      // Wall 6: solid (no adjoin)
+      TEST_CHECK("adj s0 w6 solid", s0->walls[6].next_sector == NULL);
+      TEST_CHECK("adj s0 w6 mid_tex", s0->walls[6].mid_tex == &al.textures[0]);
+
+      // Wall 5: fully open adjoin to Sector 1
+      TEST_CHECK("adj s0 w5 adjoin", s0->walls[5].next_sector == &al.sectors[1]);
+      TEST_CHECK("adj s0 w5 mirror", s0->walls[5].mirror_wall == &al.sectors[1].walls[0]);
+      TEST_CHECK("adj s0 w5 no mid", s0->walls[5].mid_tex == NULL);
+
+      // Wall 4: half-open top adjoin to Sector 2 (BOT texture assigned)
+      TEST_CHECK("adj s0 w4 adjoin", s0->walls[4].next_sector == &al.sectors[2]);
+      TEST_CHECK("adj s0 w4 mirror", s0->walls[4].mirror_wall == &al.sectors[2].walls[0]);
+      TEST_CHECK("adj s0 w4 bot_tex", s0->walls[4].bot_tex == &al.textures[0]);
+
+      // Wall 3: open bottom adjoin to Sector 3 (TOP texture assigned)
+      TEST_CHECK("adj s0 w3 adjoin", s0->walls[3].next_sector == &al.sectors[3]);
+      TEST_CHECK("adj s0 w3 mirror", s0->walls[3].mirror_wall == &al.sectors[3].walls[0]);
+      TEST_CHECK("adj s0 w3 top_tex", s0->walls[3].top_tex == &al.textures[0]);
+
+      // Wall 2: dadjoin — ADJOIN to Sec 4 (upper), DADJOIN to Sec 5 (lower)
+      TEST_CHECK("adj s0 w2 adjoin", s0->walls[2].next_sector == &al.sectors[4]);
+      TEST_CHECK("adj s0 w2 mirror", s0->walls[2].mirror_wall == &al.sectors[4].walls[0]);
+      TEST_CHECK("adj s0 w2 dadjoin", s0->walls[2].dadjoin_sector == &al.sectors[5]);
+      TEST_CHECK("adj s0 w2 dmirror", s0->walls[2].dmirror_wall == &al.sectors[5].walls[0]);
+      TEST_CHECK("adj s0 w2 mid_tex", s0->walls[2].mid_tex == &al.textures[0]);
+
+      // Sector 1: fully open (same heights as Sector 0)
+      Sector *s1 = &al.sectors[1];
+      TEST_CHECK("adj s1 floor", s1->floor_height == FIXED(0));
+      TEST_CHECK("adj s1 ceil", s1->ceiling_height == float_to_fixed16(-10.0f));
+      TEST_CHECK("adj s1 w0 adjoin back",
+                 s1->walls[0].next_sector == &al.sectors[0]);
+      TEST_CHECK("adj s1 w0 mirror back",
+                 s1->walls[0].mirror_wall == &al.sectors[0].walls[5]);
+
+      // Sector 2: higher floor (floor Y=5 -> internal floor=-5)
+      Sector *s2 = &al.sectors[2];
+      TEST_CHECK("adj s2 floor", s2->floor_height == float_to_fixed16(-5.0f));
+      TEST_CHECK("adj s2 ceil", s2->ceiling_height == float_to_fixed16(-10.0f));
+
+      // Sector 3: lower ceiling (ceil Y=5 -> internal ceil=-5)
+      Sector *s3 = &al.sectors[3];
+      TEST_CHECK("adj s3 floor", s3->floor_height == FIXED(0));
+      TEST_CHECK("adj s3 ceil", s3->ceiling_height == float_to_fixed16(-5.0f));
+
+      // Sector 4: upper dadjoin portal (floor Y=7 -> floor=-7, ceil=-10)
+      Sector *s4 = &al.sectors[4];
+      TEST_CHECK("adj s4 name", strcmp(s4->name, "room_dadj_upper") == 0);
+      TEST_CHECK("adj s4 floor", s4->floor_height == float_to_fixed16(-7.0f));
+      TEST_CHECK("adj s4 ceil", s4->ceiling_height == float_to_fixed16(-10.0f));
+      TEST_CHECK("adj s4 w0 adjoin back",
+                 s4->walls[0].next_sector == &al.sectors[0]);
+      TEST_CHECK("adj s4 w0 mirror back",
+                 s4->walls[0].mirror_wall == &al.sectors[0].walls[2]);
+
+      // Sector 5: lower dadjoin portal (floor=0, ceil Y=3 -> ceil=-3)
+      Sector *s5 = &al.sectors[5];
+      TEST_CHECK("adj s5 name", strcmp(s5->name, "room_dadj_lower") == 0);
+      TEST_CHECK("adj s5 floor", s5->floor_height == FIXED(0));
+      TEST_CHECK("adj s5 ceil", s5->ceiling_height == float_to_fixed16(-3.0f));
+      TEST_CHECK("adj s5 w0 adjoin back",
+                 s5->walls[0].next_sector == &al.sectors[0]);
+      TEST_CHECK("adj s5 w0 mirror back",
+                 s5->walls[0].mirror_wall == &al.sectors[0].walls[2]);
+    }
+  }
+
   game_level_clear();
   game_memory_shutdown();
 

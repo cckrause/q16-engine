@@ -50,6 +50,17 @@ struct Wall {
   // --- Collision ---
   int32_t collision_frame; // dedup counter
 
+  // --- Rendering ---
+  uint32_t emit_frame;       // last frame this wall was emitted to the display list
+  float emit_t0, emit_t1;    // parametric clip range of first emission (for widening)
+  int32_t emit_opaque_idx;   // start index in display list opaque array
+  int32_t emit_opaque_count; // number of opaque entries emitted
+  int32_t emit_trans_idx;    // start index in display list transparent array
+  int32_t emit_trans_count;  // number of transparent entries emitted
+  uint32_t traverse_frame;   // DFS path marker: set to draw_frame before portal
+                             // recursion, reset to 0 on return (prevents same-wall
+                             // re-traversal within a single DFS branch)
+
   // --- Lighting ---
   Fixed16 wall_light; // per-wall light adjustment (added to sector ambient)
 

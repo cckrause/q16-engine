@@ -111,6 +111,7 @@ else()
         add_executable(q16_view
             src/dev/main_view.c
             src/dev/gl_backend.c
+            src/dev/view_input.c
             lib/glad/src/glad.c
             ${FOUNDATION_SOURCES}
         )

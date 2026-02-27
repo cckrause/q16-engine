@@ -45,7 +45,7 @@ bool depth_buffer_enter_adjoin(DepthBuffer *db, int32_t min_x, int32_t max_x);
 // Exit an adjoin: copy child range back to parent (for non-subsectors),
 // then decrement depth.
 // copy_back: if true, copy child depth values back to parent (normal sectors).
-//            if false, skip copy (subsector with prev_draw_frame2 guard).
+//            if false, skip copy (subsector guard).
 void depth_buffer_exit_adjoin(DepthBuffer *db, int32_t min_x, int32_t max_x,
                               bool copy_back);
 

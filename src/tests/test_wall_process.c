@@ -3,6 +3,7 @@
 #include "render/adjoin.h"
 #include "render/camera.h"
 #include "render/frustum.h"
+#include "render/render_limits.h"
 #include "render/wall_process.h"
 #include "world/flags.h"
 #include "world/sector.h"
@@ -49,10 +50,11 @@ void test_wall_process(void) {
   wall.sign_tex = NULL;
 
   WallSegment seg;
-  bool visible = wall_process(&cam, &frustum, &wall, 0, 0.0f, -10.0f, 0.0f, 0.0f, &seg);
+  bool visible =
+      wall_process(&cam, &frustum, &wall, 0, 0.0f, -10.0f, 0.0f, 0.0f, &seg, CULL_ALL);
   TEST_CHECK("wall is visible", visible);
   TEST_CHECK("wall_x0 < wall_x1", seg.wall_x0 < seg.wall_x1);
-  TEST_CHECK("depth z0 ~10", NEAR(seg.z0, 10.0f, 0.5f));
+  TEST_CHECK("depth vz0 ~10", NEAR(seg.vz0, 10.0f, 0.5f));
   TEST_CHECK("is_solid (no adjoin)", seg.is_solid);
   TEST_CHECK("draw_flags = WDF_MIDDLE", seg.draw_flags == WDF_MIDDLE);
 
@@ -67,7 +69,8 @@ void test_wall_process(void) {
 
   WallSegment seg_back;
   bool back_visible =
-      wall_process(&cam, &frustum, &backwall, 1, 0.0f, -10.0f, 0.0f, 0.0f, &seg_back);
+      wall_process(&cam, &frustum, &backwall, 1, 0.0f, -10.0f, 0.0f, 0.0f, &seg_back,
+                   CULL_ALL);
   TEST_CHECK("backface culled", !back_visible);
 
   // Wall behind camera — both vertices at negative z, culled by frustum.
@@ -83,7 +86,8 @@ void test_wall_process(void) {
 
   WallSegment seg_behind;
   bool behind_visible =
-      wall_process(&cam, &frustum, &behind, 2, 0.0f, -10.0f, 0.0f, 0.0f, &seg_behind);
+      wall_process(&cam, &frustum, &behind, 2, 0.0f, -10.0f, 0.0f, 0.0f, &seg_behind,
+                   CULL_ALL);
   TEST_CHECK("behind camera culled", !behind_visible);
 
   // Adjoin classification.
@@ -107,7 +111,8 @@ void test_wall_process(void) {
   // floor=0, ceil=-10 vs next_floor=-2, next_ceil=-8.
   // next_floor < floor => WDF_BOT; next_ceil > ceil => WDF_TOP.
   bool adj_visible =
-      wall_process(&cam, &frustum, &adjwall, 3, 0.0f, -10.0f, -2.0f, -8.0f, &seg_adj);
+      wall_process(&cam, &frustum, &adjwall, 3, 0.0f, -10.0f, -2.0f, -8.0f, &seg_adj,
+                   CULL_ALL);
   TEST_CHECK("adjoin visible", adj_visible);
   TEST_CHECK("adjoin has WDF_TOP", (seg_adj.draw_flags & WDF_TOP) != 0);
   TEST_CHECK("adjoin has WDF_BOT", (seg_adj.draw_flags & WDF_BOT) != 0);
@@ -117,7 +122,8 @@ void test_wall_process(void) {
   // Deadjoin: next_floor >= next_ceil.
   WallSegment seg_dead;
   bool dead_visible =
-      wall_process(&cam, &frustum, &adjwall, 4, 0.0f, -10.0f, 0.0f, 0.0f, &seg_dead);
+      wall_process(&cam, &frustum, &adjwall, 4, 0.0f, -10.0f, 0.0f, 0.0f, &seg_dead,
+                   CULL_ALL);
   TEST_CHECK("deadjoin visible", dead_visible);
   TEST_CHECK("deadjoin is_solid", seg_dead.is_solid);
 
@@ -158,7 +164,8 @@ void test_wall_process(void) {
 
     WallSegment seg_dadj;
     bool dadj_visible =
-        wall_process(&cam, &frustum, &dadjwall, 5, 0.0f, -10.0f, -2.0f, -8.0f, &seg_dadj);
+        wall_process(&cam, &frustum, &dadjwall, 5, 0.0f, -10.0f, -2.0f, -8.0f, &seg_dadj,
+                     CULL_ALL);
     TEST_CHECK("dadjoin: visible", dadj_visible);
     TEST_CHECK("dadjoin: is_adjoin", seg_dadj.is_adjoin);
     TEST_CHECK("dadjoin: has_dadjoin", seg_dadj.has_dadjoin);
@@ -168,7 +175,7 @@ void test_wall_process(void) {
   {
     WallSegment seg_nodadj;
     bool nodadj_visible = wall_process(&cam, &frustum, &adjwall, 6, 0.0f, -10.0f, -2.0f,
-                                       -8.0f, &seg_nodadj);
+                                       -8.0f, &seg_nodadj, CULL_ALL);
     TEST_CHECK("no dadjoin: visible", nodadj_visible);
     TEST_CHECK("no dadjoin: !has_dadjoin", !seg_nodadj.has_dadjoin);
   }
@@ -193,7 +200,8 @@ void test_wall_process(void) {
 
     WallSegment seg_clip;
     bool clip_vis =
-        wall_process(&cam, &frustum, &lwall, 5, 0.0f, -10.0f, 0.0f, 0.0f, &seg_clip);
+        wall_process(&cam, &frustum, &lwall, 5, 0.0f, -10.0f, 0.0f, 0.0f, &seg_clip,
+                     CULL_ALL);
     TEST_CHECK("frustum clip: visible", clip_vis);
 
     float u_end =
@@ -210,8 +218,8 @@ void test_wall_process(void) {
     memset(&seg_ep, 0, sizeof(seg_ep));
     seg_ep.wall_x0 = 100;
     seg_ep.wall_x1 = 200;
-    seg_ep.z0 = 10.0f;
-    seg_ep.z1 = 10.0f;
+    seg_ep.vz0 = 10.0f;
+    seg_ep.vz1 = 10.0f;
 
     EdgePair ep;
     adjoin_compute_edge_pair(cam.focal_len_aspect, cam.proj_offset_y, 0.0f, 0.0f, -10.0f,

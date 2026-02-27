@@ -6,7 +6,6 @@
 
 #include "render/camera.h"
 #include "render/frustum.h"
-#include "render/render_limits.h"
 #include "types/forward.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -24,10 +23,6 @@ typedef struct {
   int32_t wall_x0;
   int32_t wall_x1;
 
-  // View-space depth at each screen edge (for depth interpolation).
-  float z0;
-  float z1;
-
   // View-space XZ at each endpoint (after clipping).
   float vx0, vz0;
   float vx1, vz1;
@@ -35,10 +30,6 @@ typedef struct {
   // Texture U mapping.
   float u_coord0; // texture U at wall_x0
   float du_dx;    // texture U step per screen pixel
-
-  // Depth interpolation: z = numerator / (x - x_offset).
-  float depth_slope;
-  float depth_numerator;
 
   // Wall normal in view space (for S-Buffer depth comparisons).
   float normal_x;
@@ -50,6 +41,11 @@ typedef struct {
   bool is_adjoin;      // true if wall has next_sector
   bool is_solid;       // true if solid wall or deadjoin
   bool has_dadjoin;    // true if wall has dadjoin_sector (Outlaws double adjoin)
+
+  // Parametric clip range along the original cam-space wall direction.
+  // t=0 is w0, t=1 is w1 (both transformed to cam-space).
+  float t_clip0;
+  float t_clip1;
 
   // Index into the level wall array (for S-Buffer wall_id).
   int32_t wall_index;
@@ -66,7 +62,7 @@ typedef struct {
 // seg: output segment (only valid if function returns true).
 bool wall_process(const CameraState *cam, const Frustum *frustum, Wall *wall,
                   int32_t wall_index, float floor_h, float ceil_h, float next_floor_h,
-                  float next_ceil_h, WallSegment *seg);
+                  float next_ceil_h, WallSegment *seg, uint32_t cull_mask);
 
 // Merge-sort an array of wall segments by wall_x0.
 // segments: array to sort (in-place).

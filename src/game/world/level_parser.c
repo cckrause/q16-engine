@@ -90,6 +90,7 @@ static void wall_finish(Wall *wall) {
 
   wall->seen = JFALSE;
   wall->collision_frame = 0;
+  wall->emit_frame = 0;
   wall->draw_flags = 0;
 }
 
@@ -620,7 +621,6 @@ static bool parse_sector(TextParser *p, LevelState *state, int32_t sec_idx) {
   sec->collision_frame = 0;
   sec->search_key = 0;
   sec->prev_draw_frame = 0;
-  sec->prev_draw_frame2 = 0;
   sec->draw_wall_cnt = 0;
   sec->col_min_sector = NULL;
 

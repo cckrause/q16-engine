@@ -41,8 +41,8 @@ void adjoin_compute_edge_pair(float cam_focal_aspect, float cam_proj_y, float ca
 
   // Project the ceiling/floor heights to screen Y at each wall endpoint.
   // screen_y = (height - cam_y) * focal_aspect / z + proj_offset_y
-  float inv_z0 = 1.0f / seg->z0;
-  float inv_z1 = 1.0f / seg->z1;
+  float inv_z0 = 1.0f / seg->vz0;
+  float inv_z1 = 1.0f / seg->vz1;
 
   out->y_ceil0 = (vis_ceil - cam_y) * cam_focal_aspect * inv_z0 + cam_proj_y;
   out->y_ceil1 = (vis_ceil - cam_y) * cam_focal_aspect * inv_z1 + cam_proj_y;

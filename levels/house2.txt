@@ -1,0 +1,87 @@
+=================================================================
+Title                   : Two Story House Demo
+Filename                : House2.ZIP
+Author                  : StealthJedi
+Email Address           : Stealth@DarkJedi.com
+Misc. Author Info       : http://www.nucleus.com/~dlovejoy/LawMaker/lawmaker.htm
+
+Description             : Your basic two story house demo.
+
+Additional Credits to   : Chip_DF
+================================================================
+
+* Play Information *
+
+
+3DFX Compatible         : Yes
+Mission type            : Single Player
+Difficulty Settings     : Not implemented
+New PCXs                : No
+New NWXs                : No
+New WAVs                : No
+New 3DOs                : No
+New ITMs                : No
+New Cutscenes           : No
+
+
+
+ * Multiplayer Modes*
+
+Kill fool with chicken  : No
+DeathMatch              : No
+Capture the Flag        : No
+Team Play               : No
+Secret Document         : No
+Tag n/u ?               : No
+
+ * Multiplayer Security Files *
+CHK                     : No
+ITM                     : No
+
+Note: For the level to be considered secure for tournament use in multiplayer
+it must contain .CHK and .ITM files in the Lab.The name of the file
+should contain a "S" as the last character to denote a secure level.
+EG: mylevel02S.lab
+
+
+
+
+* Construction *
+
+Base                    : New level from scratch
+Editor(s) used          : LawMaker ver 1.0 beta
+Known Bugs              : Oh the tarantula
+
+
+* Copyright / Permissions *
+
+Authors may NOT use this level as a base to build additional
+levels.  
+
+(One of the following)
+
+You MAY distribute this level, provided you include this file, with
+no modifications.  This File is not to be distributed where there
+is any charges for obtaining this file,such as distributing on
+CD/Diskette unless it is FREE.
+
+This file is intended for demonstration purposes only.You may disasemble it,
+wreck it what ever.
+
+
+The basic steps to construct the house.
+
+1. start with new sector use that as the bottom floor inside,next make a door way
+,window hole,then the bottom part of the porch.
+
+2. next the second floor is made,cut a hole for the door ,and add the porch top.
+
+3. back to the bottom floor insert a wall extrude sectors for the stairs.
+ 
+4. add the top floor in two pieces
+
+5. start with a new sector "K" insert a bunch of vertices "INS"  and wrap it around the house to build the outside area.
+
+6. Adjoin the out side walls . making sure to select the wall pointing to the last sector.
+
+7. optional create the sloped subsectors,to get to roof,(only did this so you could have a look)could have made stairs too.
