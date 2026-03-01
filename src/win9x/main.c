@@ -22,6 +22,8 @@
 #include "glide_loader.h"
 
 #include "archive/archive.h"
+#include "debug/debug_log.h"
+#include "debug/debug_vis.h"
 #include "io/stream.h"
 #include "math/core_math.h"
 #include "memory/game_memory.h"
@@ -30,7 +32,6 @@
 #include "util/strings.h"
 #include "world/level.h"
 #include "world/level_parser.h"
-#include "debug/debug_vis.h"
 #include "world/sector.h"
 #include "world/wall.h"
 
@@ -47,7 +48,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-static const char *DEFAULT_LEVEL_FILE = "house2.lvt";
+static const char *DEFAULT_ARCHIVE = "olgeo.lab";
+static const char *DEFAULT_LEVEL = "canyon";
 
 static bool s_running = true;
 static bool s_depth_test_overlay = false;
@@ -200,13 +202,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   (void)lpCmdLine;
   (void)nCmdShow;
 
-  const char *archive_path = (__argc > 1) ? __argv[1] : DEFAULT_LEVEL_FILE;
-  const char *level_name = (__argc > 2) ? __argv[2] : NULL;
+  const char *archive_path = (__argc > 1) ? __argv[1] : DEFAULT_ARCHIVE;
+  const char *level_name = (__argc > 2) ? __argv[2] : DEFAULT_LEVEL;
 
-  bool standalone = (level_name == NULL) || str_ends_with_nocase(archive_path, ".lev") ||
+  bool standalone = str_ends_with_nocase(archive_path, ".lev") ||
                     str_ends_with_nocase(archive_path, ".lvt");
 
   game_memory_init();
+  debug_log_init("q16_debug.log");
+  LOG_INFO("main", "INIT archive=%s level=%s", archive_path, level_name);
 
   LevelState state;
   memset(&state, 0, sizeof(state));
@@ -255,19 +259,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   }
 
   if (!ok) {
+    LOG_ERROR("main", "level parse failed");
     MessageBox(NULL, "Failed to parse level", "q16 Engine", MB_OK | MB_ICONERROR);
+    debug_log_shutdown();
     game_level_clear();
     game_memory_shutdown();
     return 1;
   }
+
+  LOG_INFO("main", "LEVEL_OK sectors=%d", state.sector_count);
 
   // --- Glide init ----------------------------------------------------------
 
+  LOG_INFO("main", "GLIDE_LOAD begin");
   if (glide_load() != 0) {
+    LOG_ERROR("main", "glide_load failed");
+    debug_log_shutdown();
     game_level_clear();
     game_memory_shutdown();
     return 1;
   }
+  LOG_INFO("main", "GLIDE_LOAD ok");
 
   WNDCLASS wc;
   memset(&wc, 0, sizeof(wc));
@@ -286,12 +298,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                    wr_size.bottom - wr_size.top, NULL, NULL, hInstance, NULL);
   ShowCursor(TRUE);
 
+  LOG_INFO("main", "GLIDE_INIT begin");
   gl_grGlideInit();
   gl_grSstSelect(0);
 
+  LOG_INFO("main", "GLIDE_WINOPEN begin");
   FxBool glide_ok = gl_grSstWinOpen((FxU32)hwnd, GR_RESOLUTION_640x480, GR_REFRESH_60Hz,
                                     GR_COLORFORMAT_ABGR, GR_ORIGIN_UPPER_LEFT, 2, 1);
   if (!glide_ok) {
+    LOG_ERROR("main", "grSstWinOpen failed");
     MessageBox(NULL,
                "Failed to initialise Glide!\n"
                "Make sure a Voodoo card (or nGlide wrapper) is present.",
@@ -310,12 +325,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   gl_grDepthBufferFunction(GR_CMP_LESS);
   gl_grDepthMask(FXTRUE);
   gl_grCullMode(GR_CULL_DISABLE);
+  LOG_INFO("main", "GLIDE_INIT ok");
 
   // --- Render state init ---------------------------------------------------
 
   RenderState rs;
   s_render_state = &rs;
+  LOG_INFO("main", "RENDER_STATE_INIT begin");
   if (!render_state_init(&rs, SCREEN_W, SCREEN_H, MAX_ADJOIN_DEPTH_GLIDE)) {
+    LOG_ERROR("main", "render_state_init failed");
     MessageBox(NULL, "render_state_init failed", "q16 Engine", MB_OK | MB_ICONERROR);
     gl_grGlideShutdown();
     ShowCursor(TRUE);
@@ -326,6 +344,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     return 1;
   }
 
+  rs.cull_mask &= ~CULL_SBUFFER;
   camera_set_projection(&rs.camera, SCREEN_W, SCREEN_H, DEFAULT_FOV, DEFAULT_ASPECT);
 
   float cam_x = 0.0f, cam_y = 0.0f, cam_z = 0.0f;
@@ -350,11 +369,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   QueryPerformanceFrequency(&perf_freq);
   QueryPerformanceCounter(&last_time);
 
+  LOG_INFO("main", "INIT_COMPLETE");
+
   // --- Main loop -----------------------------------------------------------
 
   MSG msg;
+  uint32_t frame_num = 0;
 
   while (s_running) {
+    frame_num++;
+    LOG_INFO_INDENT("main", 1, "F%u BEGIN", frame_num);
+
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) {
         s_running = false;
@@ -422,7 +447,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     Angle14 yaw_a = degrees_to_angle14(yaw_deg);
     Angle14 pitch_a = degrees_to_angle14(pitch_deg);
 
+    LOG_INFO_INDENT("main", 2, "RENDER sec=%d pos=(%.1f,%.1f,%.1f)",
+            cam_sector ? cam_sector->id : -1, cam_x, cam_y, cam_z);
     render_draw_frame(&rs, cam_sector, cam_x, cam_y, cam_z, yaw_a, pitch_a);
+    LOG_INFO_INDENT("main", 2, "RENDER_DONE op=%d tr=%d portals=%d", rs.display_list.opaque_count,
+            rs.display_list.transparent_count, rs.portals_traversed);
 
     // --- Debug HUD (window title) ---
     {
@@ -437,16 +466,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // --- Glide draw ---
+    LOG_INFO_INDENT("main", 2, "GLIDE_CLEAR");
     gl_grBufferClear(0x00102030, 0, GR_WDEPTHVALUE_FARTHEST);
+    LOG_INFO_INDENT("main", 2, "DRAW_LIST op=%d", rs.display_list.opaque_count);
     if (s_depth_test_overlay)
       draw_depth_test_quads();
     else
       draw_display_list(&rs.display_list, &rs.camera);
+    LOG_INFO_INDENT("main", 2, "DRAW_LIST_DONE");
+    LOG_INFO_INDENT("main", 2, "SWAP");
     gl_grBufferSwap(1);
+    LOG_INFO_INDENT("main", 2, "SWAP_DONE dt=%.1fms", dt * 1000.0f);
   }
 
   // --- Cleanup -------------------------------------------------------------
 
+  LOG_INFO("main", "SHUTDOWN begin");
   s_render_state = NULL;
   render_state_destroy(&rs);
   gl_grGlideShutdown();
@@ -454,6 +489,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   DestroyWindow(hwnd);
   glide_unload();
   game_level_clear();
+  LOG_INFO("main", "SHUTDOWN complete");
+  debug_log_shutdown();
   game_memory_shutdown();
 
   return 0;

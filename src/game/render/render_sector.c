@@ -5,11 +5,11 @@
 // fills the S-Buffer, builds the display list, and sorts objects.
 
 #include "render/render_sector.h"
+#include "debug/debug_log.h"
 #include "world/flags.h"
 #include "world/sector.h"
 #include "world/wall.h"
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -213,31 +213,37 @@ static void emit_wall_entries(RenderState *rs, const WallSegment *seg,
 }
 
 void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum) {
+  s_sector_visits++;
+  if (debug_log_is_active() && (s_sector_visits & 0xFF) == 0)
+    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "HEARTBEAT visits=%d depth=%d sec=%d portals=%d",
+            s_sector_visits, rs->adjoin_depth, sector->id, rs->portals_traversed);
+
   bool trace = rs->debug_trace;
 
   if (rs->adjoin_depth > rs->max_adjoin_depth) {
     if (trace)
-      fprintf(stderr, "  [SKIP] sec %d — depth %d > max %d\n", sector->id,
-              rs->adjoin_depth, rs->max_adjoin_depth);
+      LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "[SKIP] sec %d — depth %d > max %d",
+              sector->id, rs->adjoin_depth, rs->max_adjoin_depth);
     return;
   }
 
   if ((rs->cull_mask & CULL_PORTAL_BUDGET) && rs->portals_traversed >= rs->max_portals) {
     rs->cull_count_budget++;
     if (trace)
-      fprintf(stderr, "  [SKIP] sec %d — portal budget exhausted (%d)\n", sector->id,
-              rs->portals_traversed);
+      LOG_TRACE_INDENT("render", rs->adjoin_depth + 3,
+              "[SKIP] sec %d — portal budget exhausted (%d)",
+              sector->id, rs->portals_traversed);
     return;
   }
 
   if (trace && sector->prev_draw_frame == rs->draw_frame)
-    fprintf(stderr, "  [RE-ENTER] sec %d  frustum_planes=%d\n", sector->id,
-            frustum ? frustum->plane_count : -1);
+    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "[RE-ENTER] sec %d  frustum_planes=%d",
+            sector->id, frustum ? frustum->plane_count : -1);
   sector->prev_draw_frame = rs->draw_frame;
 
   if (trace)
-    fprintf(stderr, "  [ENTER] sec %d  depth=%d  frustum_planes=%d\n", sector->id,
-            rs->adjoin_depth, frustum ? frustum->plane_count : -1);
+    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "[ENTER] sec %d  depth=%d  frustum_planes=%d",
+            sector->id, rs->adjoin_depth, frustum ? frustum->plane_count : -1);
 
   // Track visited sectors for debug visualization.
   if (rs->visited_sectors && sector->id >= 0 && sector->id < rs->visited_capacity)
@@ -272,8 +278,8 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     if ((rs->cull_mask & CULL_DFS_MARKING) && wall->traverse_frame == rs->draw_frame) {
       rs->cull_count_dfs++;
       if (trace && wall->next_sector)
-        fprintf(stderr, "    wall %d (→sec %d) SKIP dfs-marked\n", i,
-                wall->next_sector->id);
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4, "wall %d (->sec %d) SKIP dfs-marked",
+                i, wall->next_sector->id);
       continue;
     }
 
@@ -293,14 +299,14 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     if (!wall_process(&rs->camera, frustum, wall, wall_idx, floor_h, ceil_h, next_floor,
                       next_ceil, seg, rs->cull_mask)) {
       if (trace && wall->next_sector)
-        fprintf(stderr, "    wall %d (→sec %d) CULLED by wall_process\n", i,
-                wall->next_sector->id);
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4, "wall %d (->sec %d) CULLED by wall_process",
+                i, wall->next_sector->id);
       continue;
     }
     if (trace && wall->next_sector)
-      fprintf(stderr,
-              "    wall %d (→sec %d) PASSED  vx=[%.3f,%.3f] vz=[%.3f,%.3f] adjoin=%d "
-              "solid=%d dadjoin=%d\n",
+      LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
+              "wall %d (->sec %d) PASSED  vx=[%.3f,%.3f] vz=[%.3f,%.3f] adjoin=%d "
+              "solid=%d dadjoin=%d",
               i, wall->next_sector->id, seg->vx0, seg->vx1, seg->vz0, seg->vz1,
               seg->is_adjoin, seg->is_solid, seg->has_dadjoin);
 
@@ -491,7 +497,8 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
       float pw1x = aj->seg->vx1, pw1z = aj->seg->vz1;
 
       if (trace)
-        fprintf(stderr, "    portal→sec %d  clipped cam-space v0=(%.3f,%.3f) v1=(%.3f,%.3f)\n",
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
+                "portal->sec %d  clipped cam-space v0=(%.3f,%.3f) v1=(%.3f,%.3f)",
                 target->id, pw0x, pw0z, pw1x, pw1z);
 
       if (!frustum_clip_near(&pw0x, &pw0z, &pw1x, &pw1z, NEAR_PLANE_EPSILON, NULL))
@@ -554,15 +561,16 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
       frustum_build_portal(&portal_frustum, pvx, pvz, 2);
 
       if (trace)
-        fprintf(stderr, "    portal→sec %d  frustum planes=%d\n", target->id,
-                portal_frustum.plane_count);
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4, "portal->sec %d  frustum planes=%d",
+                target->id, portal_frustum.plane_count);
 
       frustum_stack_push(&rs->frustum_stack, &portal_frustum);
       render_draw_sector(rs, target, frustum_stack_top(&rs->frustum_stack));
       frustum_stack_pop(&rs->frustum_stack);
     } else {
       if (trace)
-        fprintf(stderr, "    portal→sec %d  PORTAL_FRUSTUM OFF — using parent frustum\n",
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
+                "portal->sec %d  PORTAL_FRUSTUM OFF — using parent frustum",
                 target->id);
       render_draw_sector(rs, target, frustum);
     }

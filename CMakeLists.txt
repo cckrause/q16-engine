@@ -27,6 +27,7 @@ set(FOUNDATION_SOURCES
 
     # Section 3b — Debug
     src/game/debug/debug_vis.c
+    src/game/debug/debug_log.c
 
     # Section 4 — Archive & Filesystem
     src/game/archive/archive.c
