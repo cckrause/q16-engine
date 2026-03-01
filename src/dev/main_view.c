@@ -35,8 +35,10 @@
 
 #include "archive/archive.h"
 #include "io/stream.h"
+#include "math/core_math.h"
 #include "memory/game_memory.h"
 #include "render/render_sector.h"
+#include "util/strings.h"
 #include "world/level.h"
 #include "world/level_parser.h"
 #include "world/sector.h"
@@ -54,116 +56,13 @@
 static const char *DEFAULT_ARCHIVE = "mock/ol/OLGEO.LAB";
 static const char *DEFAULT_LEVEL = "TOWN";
 
-// Angle14 helpers.
-static Angle14 degrees_to_angle14(float deg) {
-  float wrapped = fmodf(deg, 360.0f);
-  if (wrapped < 0.0f)
-    wrapped += 360.0f;
-  return (Angle14)(wrapped * (float)ANGLE14_FULL_CIRCLE / 360.0f) & ANGLE14_MASK;
-}
-
-// Ray-casting point-in-polygon: cast a ray in +X from (px,pz) and count
-// how many wall edges it crosses. Odd count = inside.
-static bool point_in_sector(const Sector *s, float px, float pz) {
-  int32_t crossings = 0;
-  for (int32_t i = 0; i < s->wall_count; i++) {
-    float z0 = fixed16_to_float(s->walls[i].w0->z);
-    float z1 = fixed16_to_float(s->walls[i].w1->z);
-    if ((z0 <= pz && z1 > pz) || (z1 <= pz && z0 > pz)) {
-      float x0 = fixed16_to_float(s->walls[i].w0->x);
-      float x1 = fixed16_to_float(s->walls[i].w1->x);
-      float t = (pz - z0) / (z1 - z0);
-      float cross_x = x0 + t * (x1 - x0);
-      if (px < cross_x)
-        crossings++;
-    }
-  }
-  return (crossings & 1) != 0;
-}
-
-// Find the sector containing a world-space point.
-// AABB pre-filter, exact polygon test, Y-height ranking.
-// When multiple sectors overlap at the same XZ (stacked sectors),
-// prefer the one whose floor/ceiling range contains cam_y.
-static Sector *find_sector(LevelState *state, float wx, float wy, float wz) {
-  Fixed16 fx = float_to_fixed16(wx);
-  Fixed16 fz = float_to_fixed16(wz);
-
-  Sector *best = NULL;
-  bool best_y_match = false;
-  Sector *fallback = NULL;
-  float best_dist_sq = 1e18f;
-
-  for (int32_t i = 0; i < state->sector_count; i++) {
-    Sector *s = &state->sectors[i];
-    if (fx < s->bounds_min.x || fx > s->bounds_max.x || fz < s->bounds_min.z ||
-        fz > s->bounds_max.z)
-      continue;
-
-    if (!point_in_sector(s, wx, wz)) {
-      float cx = fixed16_to_float(s->bounds_min.x + s->bounds_max.x) * 0.5f;
-      float cz = fixed16_to_float(s->bounds_min.z + s->bounds_max.z) * 0.5f;
-      float dx = wx - cx, dz = wz - cz;
-      float d = dx * dx + dz * dz;
-      if (d < best_dist_sq) {
-        best_dist_sq = d;
-        fallback = s;
-      }
-      continue;
-    }
-
-    // Y-down: ceiling_height <= cam_y <= floor_height
-    float fh = fixed16_to_float(s->floor_height);
-    float ch = fixed16_to_float(s->ceiling_height);
-    bool y_ok = (wy >= ch && wy <= fh);
-
-    if (y_ok) {
-      if (!best || !best_y_match) {
-        best = s;
-        best_y_match = true;
-      } else {
-        // Both match Y — prefer tighter vertical fit.
-        float cur_h =
-            fixed16_to_float(best->floor_height) - fixed16_to_float(best->ceiling_height);
-        float new_h = fh - ch;
-        if (new_h < cur_h)
-          best = s;
-      }
-    } else if (!best) {
-      best = s;
-    }
-  }
-
-  if (best)
-    return best;
-  return fallback ? fallback : &state->sectors[0];
-}
-
-static bool path_ends_with(const char *path, const char *suffix) {
-  size_t plen = strlen(path);
-  size_t slen = strlen(suffix);
-  if (slen > plen)
-    return false;
-  for (size_t i = 0; i < slen; i++) {
-    char a = path[plen - slen + i];
-    char b = suffix[i];
-    if (a >= 'A' && a <= 'Z')
-      a += 32;
-    if (b >= 'A' && b <= 'Z')
-      b += 32;
-    if (a != b)
-      return false;
-  }
-  return true;
-}
-
 int main(int argc, char *argv[]) {
   const char *archive_path = (argc > 1) ? argv[1] : DEFAULT_ARCHIVE;
   const char *level_name = (argc > 2) ? argv[2] : DEFAULT_LEVEL;
 
   // Detect standalone .LEV/.LVT file (bypass archive).
   bool standalone =
-      path_ends_with(archive_path, ".lev") || path_ends_with(archive_path, ".lvt");
+      str_ends_with_nocase(archive_path, ".lev") || str_ends_with_nocase(archive_path, ".lvt");
 
   game_memory_init();
 
@@ -365,7 +264,8 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "[cull] RESET — all stages ON\n");
     }
 
-    Sector *cam_sector = find_sector(&state, vi.cam_x, vi.cam_y, vi.cam_z);
+    Sector *cam_sector = sector_find_at(&state, float_to_fixed16(vi.cam_x),
+                                        float_to_fixed16(vi.cam_y), float_to_fixed16(vi.cam_z));
 
     Angle14 yaw_a = degrees_to_angle14(vi.yaw_deg);
     Angle14 pitch_a = degrees_to_angle14(vi.pitch_deg);

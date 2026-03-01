@@ -12,6 +12,7 @@
 
 #include <math.h>
 
+#include "debug/debug_vis.h"
 #include "render/render_limits.h"
 #include "types/fixed16.h"
 #include "world/flags.h"
@@ -141,106 +142,6 @@ void gl_backend_destroy(GlBackend *gl) {
   memset(gl, 0, sizeof(*gl));
 }
 
-// HSV to RGB (h in [0,360), s/v in [0,1]).
-static void hsv_to_rgb(float h, float s, float v, float *r, float *g, float *b) {
-  int32_t hi = (int32_t)(h / 60.0f) % 6;
-  float f = h / 60.0f - (float)hi;
-  float p = v * (1.0f - s);
-  float q = v * (1.0f - f * s);
-  float t = v * (1.0f - (1.0f - f) * s);
-  switch (hi) {
-  case 0:
-    *r = v;
-    *g = t;
-    *b = p;
-    break;
-  case 1:
-    *r = q;
-    *g = v;
-    *b = p;
-    break;
-  case 2:
-    *r = p;
-    *g = v;
-    *b = t;
-    break;
-  case 3:
-    *r = p;
-    *g = q;
-    *b = v;
-    break;
-  case 4:
-    *r = t;
-    *g = p;
-    *b = v;
-    break;
-  default:
-    *r = v;
-    *g = p;
-    *b = q;
-    break;
-  }
-}
-
-// Golden-angle hash: maps sector ID to a unique, well-distributed hue.
-static void sector_color(int32_t sector_id, float *r, float *g, float *b) {
-  float hue = fmodf((float)sector_id * 137.508f, 360.0f);
-  hsv_to_rgb(hue, 0.7f, 0.9f, r, g, b);
-}
-
-// Part ID colors.
-static void part_color(int32_t part_id, float *r, float *g, float *b) {
-  switch (part_id) {
-  case PART_MID_WALL:
-    *r = 1.0f;
-    *g = 1.0f;
-    *b = 1.0f;
-    break; // white
-  case PART_TOP_WALL:
-    *r = 1.0f;
-    *g = 1.0f;
-    *b = 0.3f;
-    break; // yellow
-  case PART_BOT_WALL:
-    *r = 0.3f;
-    *g = 1.0f;
-    *b = 1.0f;
-    break; // cyan
-  case PART_FLOOR:
-    *r = 0.2f;
-    *g = 0.8f;
-    *b = 0.2f;
-    break; // green
-  case PART_CEILING:
-    *r = 0.8f;
-    *g = 0.2f;
-    *b = 0.2f;
-    break; // red
-  case PART_FLOOR_CAP:
-    *r = 0.1f;
-    *g = 0.4f;
-    *b = 0.1f;
-    break; // dark green
-  case PART_CEILING_CAP:
-    *r = 0.4f;
-    *g = 0.1f;
-    *b = 0.1f;
-    break; // dark red
-  case PART_MID_SIGN:
-  case PART_TOP_SIGN:
-  case PART_BOT_SIGN:
-    *r = 1.0f;
-    *g = 0.5f;
-    *b = 0.0f;
-    break; // orange
-  default:
-    *r = 0.5f;
-    *g = 0.5f;
-    *b = 0.5f;
-    break; // grey
-  }
-}
-
 // Build a perspective projection matrix for our view-space convention:
 //   +X right, +Y down, +Z forward
 // Maps to OpenGL NDC: X [-1,1], Y [-1,1] (up), Z [-1,1].
@@ -330,9 +231,9 @@ static void expand_entries_filled(const DisplayListEntry *entries, int32_t count
 
     float r, g, b;
     if (color_mode == GL_COLOR_SECTOR) {
-      sector_color(sec_id, &r, &g, &b);
+      debug_sector_color(sec_id, &r, &g, &b);
     } else {
-      part_color(part_id, &r, &g, &b);
+      debug_part_color(part_id, &r, &g, &b);
     }
 
     int32_t added = 0;
@@ -380,9 +281,9 @@ static void expand_entries(const DisplayListEntry *entries, int32_t count,
 
     float r, g, b;
     if (color_mode == GL_COLOR_SECTOR) {
-      sector_color(sec_id, &r, &g, &b);
+      debug_sector_color(sec_id, &r, &g, &b);
     } else {
-      part_color(part_id, &r, &g, &b);
+      debug_part_color(part_id, &r, &g, &b);
     }
 
     int32_t added = 0;
@@ -652,7 +553,7 @@ void gl_backend_draw_minimap(GlBackend *gl, const Sector *sectors, int32_t secto
       g = 1.0f;
       b = 0.0f;
     } else if (visited && visited[i]) {
-      sector_color(i, &r, &g, &b);
+      debug_sector_color(i, &r, &g, &b);
     } else {
       r = 0.15f;
       g = 0.15f;
