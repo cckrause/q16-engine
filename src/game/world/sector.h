@@ -6,6 +6,7 @@
 
 #include "types/forward.h"
 #include "world/flags.h"
+#include <stdbool.h>
 
 // Active when sector_idx >= 0, wall_idx >= 0, and angle != 0.
 // angle is fixed-point: 4096 = 90 degrees.
@@ -96,5 +97,14 @@ struct Sector {
   // --- Misc ---
   Sector *col_min_sector; // sector with lowest floor found during collision
 };
+
+// --- Spatial queries -------------------------------------------------------
+
+// Ray-casting point-in-polygon test on the XZ plane.
+bool sector_contains_point(const Sector *s, Fixed16 px, Fixed16 pz);
+
+// Find the sector containing (x, y, z). Prefers sectors whose floor/ceiling
+// bracket y. Falls back to nearest bounding-box center, then sectors[0].
+Sector *sector_find_at(LevelState *state, Fixed16 x, Fixed16 y, Fixed16 z);
 
 #endif /* Q16_WORLD_SECTOR_H */

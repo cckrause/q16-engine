@@ -42,4 +42,7 @@ Angle14 get_angle_difference(Angle14 angle0, Angle14 angle1);
 // not -sin_angle.
 Angle14 arc_cos_fixed(Fixed16 sin_angle, Angle14 angle);
 
+// Convert degrees (float) to Angle14. Wraps to [0, 16383].
+Angle14 degrees_to_angle14(float deg);
+
 #endif /* Q16_MATH_CORE_MATH_H */

@@ -24,6 +24,7 @@ typedef FxI32 GrCombineLocal_t;
 typedef FxI32 GrCombineOther_t;
 typedef FxI32 GrDepthBufferMode_t;
 typedef FxI32 GrCullMode_t;
+typedef FxI32 GrCmpFnc_t;
 typedef FxI32 GrBuffer_t;
 
 /* ================================================================
@@ -106,6 +107,33 @@ typedef FxI32 GrBuffer_t;
 #define GR_DEPTHBUFFER_WBUFFER_COMPARE_TO_BIAS 0x4
 
 /* ================================================================
+ *  Alpha blend function
+ * ================================================================ */
+#define GR_BLEND_ZERO                0x0
+#define GR_BLEND_SRC_ALPHA           0x1
+#define GR_BLEND_SRC_COLOR           0x2
+#define GR_BLEND_DST_COLOR           0x3
+#define GR_BLEND_ONE                 0x4
+#define GR_BLEND_ONE_MINUS_SRC_ALPHA 0x5
+#define GR_BLEND_ONE_MINUS_SRC_COLOR 0x6
+#define GR_BLEND_ONE_MINUS_DST_COLOR 0x7
+#define GR_BLEND_ALPHA_SATURATE      0xf
+
+typedef FxI32 GrAlphaBlendFnc_t;
+
+/* ================================================================
+ *  Depth compare function
+ * ================================================================ */
+#define GR_CMP_NEVER    0x0
+#define GR_CMP_LESS     0x1
+#define GR_CMP_EQUAL    0x2
+#define GR_CMP_LEQUAL   0x3
+#define GR_CMP_GREATER  0x4
+#define GR_CMP_NOTEQUAL 0x5
+#define GR_CMP_GEQUAL   0x6
+#define GR_CMP_ALWAYS   0x7
+
+/* ================================================================
  *  Cull mode
  * ================================================================ */
 #define GR_CULL_DISABLE 0x0
@@ -121,8 +149,24 @@ typedef FxI32 GrBuffer_t;
 #define GR_BUFFER_DEPTHBUFFER 0x3
 
 /* ================================================================
- *  Vertex structure (Glide 2.x - fixed layout)
- *  Color components r, g, b, a are floats in range 0..255
+ *  Vertex structure (Glide 2.x — fixed ABI layout)
+ *
+ *  Field order MUST match the Glide 2.x SDK (see Programming Guide
+ *  §2 "Specifying Vertices").  The DLL reads fields at hardcoded
+ *  byte offsets; any reordering silently corrupts colours and depth.
+ *
+ *  Offset  Field
+ *  ------  -----
+ *    0     x        screen X
+ *    4     y        screen Y
+ *    8     z        fog depth (often unused)
+ *   12     r        red   [0..255]
+ *   16     g        green [0..255]
+ *   20     b        blue  [0..255]
+ *   24     ooz      65535/z  (Z-buffer depth)
+ *   28     a        alpha [0..255]
+ *   32     oow      1/w   (W-buffer depth + perspective tex)
+ *   36+    tmuvtx   per-TMU texture coords
  * ================================================================ */
 #define GLIDE_NUM_TMU 1
 
@@ -133,11 +177,11 @@ typedef struct {
 } GrTmuVertex;
 
 typedef struct {
-  float x, y;       /* screen-space position                */
-  float ooz;        /* 65535/z for depth buffering           */
-  float oow;        /* 1/w for perspective correction        */
-  float r, g, b, a; /* vertex color, floats in [0..255]     */
-  float z;          /* z coordinate (if not using ooz)      */
+  float x, y, z;    /* screen position; z used for fog       */
+  float r, g, b;    /* vertex color [0..255]                 */
+  float ooz;        /* 65535/z for Z-buffer depth             */
+  float a;          /* alpha [0..255]                        */
+  float oow;        /* 1/w for W-buffer depth + perspective  */
   GrTmuVertex tmuvtx[GLIDE_NUM_TMU];
 } GrVertex;
 
@@ -178,8 +222,16 @@ FX_ENTRY void FX_CALL grColorCombine(GrCombineFunction_t function,
                                      GrCombineLocal_t local,
                                      GrCombineOther_t other, FxBool invert);
 
+/* Alpha blending */
+FX_ENTRY void FX_CALL grAlphaBlendFunction(GrAlphaBlendFnc_t rgb_sf,
+                                           GrAlphaBlendFnc_t rgb_df,
+                                           GrAlphaBlendFnc_t alpha_sf,
+                                           GrAlphaBlendFnc_t alpha_df);
+
 /* Depth buffer */
 FX_ENTRY void FX_CALL grDepthBufferMode(GrDepthBufferMode_t mode);
+FX_ENTRY void FX_CALL grDepthBufferFunction(GrCmpFnc_t function);
+FX_ENTRY void FX_CALL grDepthMask(FxBool mask);
 
 /* Culling */
 FX_ENTRY void FX_CALL grCullMode(GrCullMode_t mode);

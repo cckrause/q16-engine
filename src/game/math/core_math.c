@@ -5,6 +5,7 @@
 
 #include "math/core_math.h"
 #include "math/trig_table.h"
+#include <math.h>   // fmodf()
 #include <stdlib.h> // abs()
 
 // Internal helpers
@@ -92,6 +93,15 @@ Angle14 get_angle_difference(Angle14 angle0, Angle14 angle1) {
     return d_angle;
   }
   return d_angle >= 0 ? d_angle - ANGLE14_FULL_CIRCLE : d_angle + ANGLE14_FULL_CIRCLE;
+}
+
+// degrees_to_angle14
+
+Angle14 degrees_to_angle14(float deg) {
+  float wrapped = fmodf(deg, 360.0f);
+  if (wrapped < 0.0f)
+    wrapped += 360.0f;
+  return (Angle14)(wrapped * (float)ANGLE14_FULL_CIRCLE / 360.0f) & ANGLE14_MASK;
 }
 
 // arc_cos_fixed

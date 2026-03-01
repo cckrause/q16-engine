@@ -9,7 +9,10 @@ EXPORTS
     grSstSelect@4
     grSstWinOpen@28
     grColorCombine@20
+    grAlphaBlendFunction@16
     grDepthBufferMode@4
+    grDepthBufferFunction@4
+    grDepthMask@4
     grCullMode@4
     grBufferClear@12
     grBufferSwap@4

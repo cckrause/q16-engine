@@ -33,6 +33,7 @@ set(FOUNDATION_SOURCES
     src/game/io/text_parser.c
 
     # Section 6 — World / Level
+    src/game/world/sector.c
     src/game/world/level_parser.c
 
     # Section 7 — Render Pipeline (CPU geometry)
@@ -57,13 +58,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     include_directories(${CMAKE_SOURCE_DIR}/lib)
 
     add_executable(q16_engine WIN32
-        src/glide-test/main.c
-        src/glide-test/demo.c
+        src/win9x/main.c
         ${FOUNDATION_SOURCES}
     )
 
     target_include_directories(q16_engine PRIVATE
-        ${CMAKE_SOURCE_DIR}/src/glide-test
+        ${CMAKE_SOURCE_DIR}/src/win9x
     )
 
     set_target_properties(q16_engine PROPERTIES

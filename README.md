@@ -12,6 +12,37 @@ The CPU render pipeline is complete: portal-based sector traversal, frustum cull
 
 527 tests across 20 suites, all passing.
 
+## Getting Started
+
+Install dependencies on macOS:
+
+```bash
+brew install mingw-w64 cmake sdl2
+```
+
+The project uses [CMake Presets](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html). Two presets are available:
+
+```bash
+cmake --preset win32          # configure Win9x cross-build (MinGW i686)
+cmake --build --preset win32  # → build-win32/q16_engine.exe
+
+cmake --preset dev            # configure native dev build (macOS/Linux)
+cmake --build --preset dev    # → build/q16_*
+```
+
+Native dev tools after building with `dev`:
+
+```bash
+./build/q16_tests    # 527 unit tests
+./build/q16_view     # wireframe level viewer (SDL2 + OpenGL)
+./build/q16_gob      # GOB archive inspector
+./build/q16_lab      # LAB archive inspector
+./build/q16_lev      # level geometry inspector
+./build/q16_dev      # dev harness
+```
+
+To run `q16_engine.exe` you need Windows 95/98 with a 3dfx Voodoo card (or emulated via [86Box](https://86box.net/) / [PCem](https://pcem-emulator.co.uk/)), or [nGlide](https://www.zeus-software.com/downloads/nglide) on modern Windows.
+
 ## Target Platform
 
 | Component | Target |
@@ -112,45 +143,6 @@ These tools run natively on macOS/Linux and are used for development, debugging,
 - Audio (DirectSound / WinMM, VOC playback, iMuse MIDI)
 - Save/load serialization
 
-## Build
-
-### Requirements
-
-**Build host (macOS):**
-- [MinGW-w64](https://www.mingw-w64.org/) cross-compiler: `brew install mingw-w64`
-- [CMake](https://cmake.org/) 3.10+: `brew install cmake`
-- [SDL2](https://www.libsdl.org/) (for `q16_view`): `brew install sdl2`
-
-**Target system:**
-- Windows 95/98 with 3dfx Voodoo (real or emulated) and `glide2x.dll`
-- Emulators: [86Box](https://86box.net/) or [PCem](https://pcem-emulator.co.uk/) with Voodoo enabled
-- Alternatively: [nGlide](https://www.zeus-software.com/downloads/nglide) wrapper on modern Windows
-
-### Win32 Cross-Compile
-
-```bash
-cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw32.cmake
-cmake --build build
-```
-
-Output: `build/q16_engine.exe` (PE32)
-
-### Native Dev Build (macOS/Linux)
-
-```bash
-cmake -B build
-cmake --build build
-```
-
-```bash
-./build/q16_tests    # unit tests
-./build/q16_view     # wireframe level viewer
-./build/q16_gob      # GOB archive inspector
-./build/q16_lab      # LAB archive inspector
-./build/q16_lev      # level geometry inspector
-./build/q16_dev      # dev harness
-```
-
 ## Project Structure
 
 ```
@@ -168,7 +160,7 @@ src/
   tests/            Unit tests (test runner + 19 suites)
   cli/              Archive and level inspector tools (q16_gob, q16_lab, q16_lev)
   dev/              SDL2 + OpenGL wireframe level viewer (q16_view)
-  glide-test/       Win32 + Glide 2.x rendering test harness
+  win9x/            Win32 + Glide 2.x rendering target
 lib/
   glad/             OpenGL loader (dev build only)
   glide2/           Glide 2.x API headers (3dfx.h, glide.h)

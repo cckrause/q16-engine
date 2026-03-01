@@ -18,7 +18,11 @@ typedef FxBool(__stdcall *pfn_grSstWinOpen)(FxU32, GrScreenResolution_t,
                                             GrOriginLocation_t, int, int);
 typedef void(__stdcall *pfn_grColorCombine)(GrCombineFunction_t, GrCombineFactor_t,
                                             GrCombineLocal_t, GrCombineOther_t, FxBool);
+typedef void(__stdcall *pfn_grAlphaBlendFunction)(GrAlphaBlendFnc_t, GrAlphaBlendFnc_t,
+                                                  GrAlphaBlendFnc_t, GrAlphaBlendFnc_t);
 typedef void(__stdcall *pfn_grDepthBufferMode)(GrDepthBufferMode_t);
+typedef void(__stdcall *pfn_grDepthBufferFunction)(GrCmpFnc_t);
+typedef void(__stdcall *pfn_grDepthMask)(FxBool);
 typedef void(__stdcall *pfn_grCullMode)(GrCullMode_t);
 typedef void(__stdcall *pfn_grBufferClear)(GrColor_t, GrAlpha_t, FxU16);
 typedef void(__stdcall *pfn_grBufferSwap)(FxU32);
@@ -31,7 +35,10 @@ static pfn_grGlideShutdown gl_grGlideShutdown;
 static pfn_grSstSelect gl_grSstSelect;
 static pfn_grSstWinOpen gl_grSstWinOpen;
 static pfn_grColorCombine gl_grColorCombine;
+static pfn_grAlphaBlendFunction gl_grAlphaBlendFunction;
 static pfn_grDepthBufferMode gl_grDepthBufferMode;
+static pfn_grDepthBufferFunction gl_grDepthBufferFunction;
+static pfn_grDepthMask gl_grDepthMask;
 static pfn_grCullMode gl_grCullMode;
 static pfn_grBufferClear gl_grBufferClear;
 static pfn_grBufferSwap gl_grBufferSwap;
@@ -72,7 +79,10 @@ static int glide_load(void) {
   LOAD(grSstSelect, "_grSstSelect@4")
   LOAD(grSstWinOpen, "_grSstWinOpen@28")
   LOAD(grColorCombine, "_grColorCombine@20")
+  LOAD(grAlphaBlendFunction, "_grAlphaBlendFunction@16")
   LOAD(grDepthBufferMode, "_grDepthBufferMode@4")
+  LOAD(grDepthBufferFunction, "_grDepthBufferFunction@4")
+  LOAD(grDepthMask, "_grDepthMask@4")
   LOAD(grCullMode, "_grCullMode@4")
   LOAD(grBufferClear, "_grBufferClear@12")
   LOAD(grBufferSwap, "_grBufferSwap@4")

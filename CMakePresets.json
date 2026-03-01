@@ -1,0 +1,33 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Native Dev (macOS/Linux)",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "win32",
+      "displayName": "Win9x Cross (MinGW i686)",
+      "binaryDir": "${sourceDir}/build-win32",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-mingw32.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "win32",
+      "configurePreset": "win32",
+      "targets": ["q16_engine"]
+    }
+  ]
+}
