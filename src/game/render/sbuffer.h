@@ -10,9 +10,11 @@
 #include <stdint.h>
 
 // 2D occlusion structure for GPU-based portal rendering. Operates on the
-// XZ plane using a unit-square projection that maps the full 360-degree
-// view onto [0, 4). Overlaps are resolved by a separating-plane test on
-// wall normals (geometrically exact for non-intersecting walls).
+// XZ plane. Horizontal angle (atan2(vx,vz)) is mapped to a 1D coordinate
+// in [0, 4) so that 1 unit = 90° (full circle = 4). Segment overlap in
+// this coordinate is used for occlusion; depth is resolved by a
+// separating-plane test on wall normals (geometrically exact for
+// non-intersecting walls).
 
 typedef struct SBufferSeg {
   float start; // projected start [0, 4)
