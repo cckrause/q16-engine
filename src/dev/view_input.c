@@ -56,13 +56,20 @@ static ViewInputActions process_events(ViewInput *vi) {
 
       {
         uint32_t toggle = 0;
-        if (ev.key.keysym.sym == SDLK_1) toggle = CULL_BACKFACE;
-        if (ev.key.keysym.sym == SDLK_2) toggle = CULL_FRUSTUM;
-        if (ev.key.keysym.sym == SDLK_3) toggle = CULL_SBUFFER;
-        if (ev.key.keysym.sym == SDLK_4) toggle = CULL_DFS_MARKING;
-        if (ev.key.keysym.sym == SDLK_5) toggle = CULL_PORTAL_BUDGET;
-        if (ev.key.keysym.sym == SDLK_6) toggle = CULL_FRUSTUM_CLIP;
-        if (ev.key.keysym.sym == SDLK_7) toggle = CULL_PORTAL_FRUSTUM;
+        if (ev.key.keysym.sym == SDLK_1)
+          toggle = CULL_BACKFACE;
+        if (ev.key.keysym.sym == SDLK_2)
+          toggle = CULL_FRUSTUM;
+        if (ev.key.keysym.sym == SDLK_3)
+          toggle = CULL_SBUFFER;
+        if (ev.key.keysym.sym == SDLK_4)
+          toggle = CULL_DFS_MARKING;
+        if (ev.key.keysym.sym == SDLK_5)
+          toggle = CULL_PORTAL_BUDGET;
+        if (ev.key.keysym.sym == SDLK_6)
+          toggle = CULL_FRUSTUM_CLIP;
+        if (ev.key.keysym.sym == SDLK_7)
+          toggle = CULL_PORTAL_FRUSTUM;
         if (toggle)
           acts.cull_toggle |= toggle;
         if (ev.key.keysym.sym == SDLK_0)

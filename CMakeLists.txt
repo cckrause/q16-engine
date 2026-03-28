@@ -77,33 +77,12 @@ else()
     # -------------------------------------------------------------------
     # Native dev build (Mac / Linux)
     # -------------------------------------------------------------------
-    add_executable(q16_dev
-        src/main_dev.c
+    add_executable(q16_cli
+        src/cli/main_cli.c
         ${FOUNDATION_SOURCES}
     )
 
-    target_compile_options(q16_dev PRIVATE -Wall -Wextra -Wno-unused-parameter)
-
-    add_executable(q16_gob
-        src/cli/main_gob.c
-        ${FOUNDATION_SOURCES}
-    )
-
-    target_compile_options(q16_gob PRIVATE -Wall -Wextra -Wno-unused-parameter)
-
-    add_executable(q16_lab
-        src/cli/main_lab.c
-        ${FOUNDATION_SOURCES}
-    )
-
-    target_compile_options(q16_lab PRIVATE -Wall -Wextra -Wno-unused-parameter)
-
-    add_executable(q16_lev
-        src/cli/main_lev.c
-        ${FOUNDATION_SOURCES}
-    )
-
-    target_compile_options(q16_lev PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    target_compile_options(q16_cli PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
     # -------------------------------------------------------------------
     # Wireframe level viewer (SDL2 + OpenGL 3.3)

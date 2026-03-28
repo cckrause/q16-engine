@@ -54,15 +54,12 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-static const char *DEFAULT_ARCHIVE = "mock/ol/OLGEO.LAB";
-static const char *DEFAULT_LEVEL = "TOWN";
-
 int main(int argc, char *argv[]) {
-  const char *archive_path = (argc > 1) ? argv[1] : DEFAULT_ARCHIVE;
-  const char *level_name = (argc > 2) ? argv[2] : DEFAULT_LEVEL;
+  const char *archive_path = (argc > 1) ? argv[1] : "";
+  const char *level_name = (argc > 2) ? argv[2] : "";
 
-  bool standalone =
-      str_ends_with_nocase(archive_path, ".lev") || str_ends_with_nocase(archive_path, ".lvt");
+  bool standalone = str_ends_with_nocase(archive_path, ".lev") ||
+                    str_ends_with_nocase(archive_path, ".lvt");
 
   game_memory_init();
   debug_log_init(NULL);
@@ -96,8 +93,8 @@ int main(int argc, char *argv[]) {
     if (!archive_file_exists(ar, filename)) {
       snprintf(filename, sizeof(filename), "%s.LVT", level_name);
       if (!archive_file_exists(ar, filename)) {
-        LOG_ERROR("view", "neither '%s.LEV' nor '%s.LVT' found in archive",
-               level_name, level_name);
+        LOG_ERROR("view", "neither '%s.LEV' nor '%s.LVT' found in archive", level_name,
+                  level_name);
         archive_close(ar);
         debug_log_shutdown();
         game_memory_shutdown();
@@ -127,8 +124,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  LOG_INFO("view", "LEVEL_OK %s — %d sectors, %d walls, %d vertices",
-         state.level_name, state.sector_count, state.wall_count, state.vertex_count);
+  LOG_INFO("view", "LEVEL_OK %s — %d sectors, %d walls, %d vertices", state.level_name,
+           state.sector_count, state.wall_count, state.vertex_count);
 
   // SDL + OpenGL init.
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -264,23 +261,24 @@ int main(int argc, char *argv[]) {
     if (acts.cull_toggle) {
       rs.cull_mask ^= acts.cull_toggle;
       LOG_INFO("view",
-             "[cull] 1:bface=%s 2:ftest=%s 3:sbuf=%s 4:dfs=%s 5:budg=%s "
-             "6:fclip=%s 7:pfrust=%s",
-             (rs.cull_mask & CULL_BACKFACE) ? "ON" : "off",
-             (rs.cull_mask & CULL_FRUSTUM) ? "ON" : "off",
-             (rs.cull_mask & CULL_SBUFFER) ? "ON" : "off",
-             (rs.cull_mask & CULL_DFS_MARKING) ? "ON" : "off",
-             (rs.cull_mask & CULL_PORTAL_BUDGET) ? "ON" : "off",
-             (rs.cull_mask & CULL_FRUSTUM_CLIP) ? "ON" : "off",
-             (rs.cull_mask & CULL_PORTAL_FRUSTUM) ? "ON" : "off");
+               "[cull] 1:bface=%s 2:ftest=%s 3:sbuf=%s 4:dfs=%s 5:budg=%s "
+               "6:fclip=%s 7:pfrust=%s",
+               (rs.cull_mask & CULL_BACKFACE) ? "ON" : "off",
+               (rs.cull_mask & CULL_FRUSTUM) ? "ON" : "off",
+               (rs.cull_mask & CULL_SBUFFER) ? "ON" : "off",
+               (rs.cull_mask & CULL_DFS_MARKING) ? "ON" : "off",
+               (rs.cull_mask & CULL_PORTAL_BUDGET) ? "ON" : "off",
+               (rs.cull_mask & CULL_FRUSTUM_CLIP) ? "ON" : "off",
+               (rs.cull_mask & CULL_PORTAL_FRUSTUM) ? "ON" : "off");
     }
     if (acts.cull_reset) {
       rs.cull_mask = CULL_ALL;
       LOG_INFO("view", "[cull] RESET — all stages ON");
     }
 
-    Sector *cam_sector = sector_find_at(&state, float_to_fixed16(vi.cam_x),
-                                        float_to_fixed16(vi.cam_y), float_to_fixed16(vi.cam_z));
+    Sector *cam_sector =
+        sector_find_at(&state, float_to_fixed16(vi.cam_x), float_to_fixed16(vi.cam_y),
+                       float_to_fixed16(vi.cam_z));
 
     Angle14 yaw_a = degrees_to_angle14(vi.yaw_deg);
     Angle14 pitch_a = degrees_to_angle14(vi.pitch_deg);
@@ -288,7 +286,7 @@ int main(int argc, char *argv[]) {
     // Run CPU render pipeline.
     if (rs.debug_trace)
       LOG_INFO("view", "=== TRACE FRAME  sec=%d  yaw=%.1f  cam=(%.2f,%.2f,%.2f) ===",
-             cam_sector->id, vi.yaw_deg, vi.cam_x, vi.cam_y, vi.cam_z);
+               cam_sector->id, vi.yaw_deg, vi.cam_x, vi.cam_y, vi.cam_z);
     render_draw_frame(&rs, cam_sector, vi.cam_x, vi.cam_y, vi.cam_z, yaw_a, pitch_a);
     if (rs.debug_trace) {
       LOG_INFO("view", "=== END TRACE  opaque=%d ===", rs.display_list.opaque_count);
@@ -297,9 +295,10 @@ int main(int argc, char *argv[]) {
     static int frame_count = 0;
     static int prev_sector_id = -1;
     if (cam_sector->id != prev_sector_id) {
-      LOG_INFO("view", "[frame %d] SECTOR CHANGE %d -> %d  opaque=%d cam=(%.1f,%.1f,%.1f)",
-             frame_count, prev_sector_id, cam_sector->id, rs.display_list.opaque_count,
-             vi.cam_x, vi.cam_y, vi.cam_z);
+      LOG_INFO("view",
+               "[frame %d] SECTOR CHANGE %d -> %d  opaque=%d cam=(%.1f,%.1f,%.1f)",
+               frame_count, prev_sector_id, cam_sector->id, rs.display_list.opaque_count,
+               vi.cam_x, vi.cam_y, vi.cam_z);
       prev_sector_id = cam_sector->id;
     } else if (frame_count % 120 == 0) {
       char buf[256];
@@ -308,8 +307,9 @@ int main(int argc, char *argv[]) {
                          frame_count, cam_sector->id, rs.display_list.opaque_count,
                          rs.max_adjoin_depth, vi.cam_x, vi.cam_y, vi.cam_z);
       if (rs.cull_count_sbuffer || rs.cull_count_dfs || rs.cull_count_budget)
-        snprintf(buf + len, sizeof(buf) - (size_t)len, "  culled: sbuf=%d dfs=%d budget=%d",
-                 rs.cull_count_sbuffer, rs.cull_count_dfs, rs.cull_count_budget);
+        snprintf(buf + len, sizeof(buf) - (size_t)len,
+                 "  culled: sbuf=%d dfs=%d budget=%d", rs.cull_count_sbuffer,
+                 rs.cull_count_dfs, rs.cull_count_budget);
       LOG_INFO("view", "%s", buf);
     }
     frame_count++;
@@ -328,7 +328,8 @@ int main(int argc, char *argv[]) {
     if (vi.show_minimap) {
       float yaw_rad = vi.yaw_deg * (float)(M_PI / 180.0);
       gl_backend_draw_minimap(&gl, state.sectors, state.sector_count, rs.visited_sectors,
-                              cam_sector->id, vi.cam_x, vi.cam_z, yaw_rad, draw_w, draw_h);
+                              cam_sector->id, vi.cam_x, vi.cam_z, yaw_rad, draw_w,
+                              draw_h);
     }
 
     SDL_GL_SwapWindow(window);
