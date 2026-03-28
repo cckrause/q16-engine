@@ -65,6 +65,11 @@ typedef struct {
   int32_t cull_count_sbuffer;
   int32_t cull_count_dfs;
   int32_t cull_count_budget;
+
+  // Heap workspace for recursive render_draw_sector. One slot per depth level
+  // avoids ~100 KB/level stack allocations that overflow Win98's 1 MB stack.
+  WallSegment *seg_pool;     // flat: (max_adjoin_depth + 1) * MAX_WALL_SEG
+  AdjoinList *adjoin_pool;   // array: (max_adjoin_depth + 1) AdjoinLists
 } RenderState;
 
 // Initialize all subsystems. Screen dimensions and limits must be known.

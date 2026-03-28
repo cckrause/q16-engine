@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int32_t s_sector_visits;
+
 bool render_state_init(RenderState *rs, int32_t screen_width, int32_t screen_height,
                        int32_t max_adjoin_depth) {
   memset(rs, 0, sizeof(RenderState));
@@ -32,6 +34,16 @@ bool render_state_init(RenderState *rs, int32_t screen_width, int32_t screen_hei
   if (!display_list_init(&rs->display_list, MAX_DISP_ITEMS, MAX_PORTALS))
     goto fail_dlist;
 
+  int32_t depth_levels = max_adjoin_depth + 1;
+  rs->seg_pool =
+      (WallSegment *)malloc((size_t)depth_levels * MAX_WALL_SEG * sizeof(WallSegment));
+  if (!rs->seg_pool)
+    goto fail_seg_pool;
+
+  rs->adjoin_pool = (AdjoinList *)malloc((size_t)depth_levels * sizeof(AdjoinList));
+  if (!rs->adjoin_pool)
+    goto fail_adjoin_pool;
+
   frustum_stack_init(&rs->frustum_stack);
   rs->draw_frame = 0;
   rs->adjoin_depth = 0;
@@ -43,6 +55,10 @@ bool render_state_init(RenderState *rs, int32_t screen_width, int32_t screen_hei
   rs->visited_capacity = 0;
   return true;
 
+fail_adjoin_pool:
+  free(rs->seg_pool);
+fail_seg_pool:
+  display_list_destroy(&rs->display_list);
 fail_dlist:
   flat_destroy(&rs->flat);
 fail_flat:
@@ -55,6 +71,10 @@ fail_depth:
 }
 
 void render_state_destroy(RenderState *rs) {
+  free(rs->adjoin_pool);
+  free(rs->seg_pool);
+  rs->adjoin_pool = NULL;
+  rs->seg_pool = NULL;
   display_list_destroy(&rs->display_list);
   flat_destroy(&rs->flat);
   render_window_destroy(&rs->window);
@@ -215,15 +235,17 @@ static void emit_wall_entries(RenderState *rs, const WallSegment *seg,
 void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum) {
   s_sector_visits++;
   if (debug_log_is_active() && (s_sector_visits & 0xFF) == 0)
-    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "HEARTBEAT visits=%d depth=%d sec=%d portals=%d",
-            s_sector_visits, rs->adjoin_depth, sector->id, rs->portals_traversed);
+    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3,
+                     "HEARTBEAT visits=%d depth=%d sec=%d portals=%d", s_sector_visits,
+                     rs->adjoin_depth, sector->id, rs->portals_traversed);
 
   bool trace = rs->debug_trace;
 
   if (rs->adjoin_depth > rs->max_adjoin_depth) {
     if (trace)
-      LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "[SKIP] sec %d — depth %d > max %d",
-              sector->id, rs->adjoin_depth, rs->max_adjoin_depth);
+      LOG_TRACE_INDENT("render", rs->adjoin_depth + 3,
+                       "[SKIP] sec %d — depth %d > max %d", sector->id, rs->adjoin_depth,
+                       rs->max_adjoin_depth);
     return;
   }
 
@@ -231,19 +253,21 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     rs->cull_count_budget++;
     if (trace)
       LOG_TRACE_INDENT("render", rs->adjoin_depth + 3,
-              "[SKIP] sec %d — portal budget exhausted (%d)",
-              sector->id, rs->portals_traversed);
+                       "[SKIP] sec %d — portal budget exhausted (%d)", sector->id,
+                       rs->portals_traversed);
     return;
   }
 
   if (trace && sector->prev_draw_frame == rs->draw_frame)
-    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "[RE-ENTER] sec %d  frustum_planes=%d",
-            sector->id, frustum ? frustum->plane_count : -1);
+    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3,
+                     "[RE-ENTER] sec %d  frustum_planes=%d", sector->id,
+                     frustum ? frustum->plane_count : -1);
   sector->prev_draw_frame = rs->draw_frame;
 
   if (trace)
-    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3, "[ENTER] sec %d  depth=%d  frustum_planes=%d",
-            sector->id, rs->adjoin_depth, frustum ? frustum->plane_count : -1);
+    LOG_TRACE_INDENT("render", rs->adjoin_depth + 3,
+                     "[ENTER] sec %d  depth=%d  frustum_planes=%d", sector->id,
+                     rs->adjoin_depth, frustum ? frustum->plane_count : -1);
 
   // Track visited sectors for debug visualization.
   if (rs->visited_sectors && sector->id >= 0 && sector->id < rs->visited_capacity)
@@ -259,7 +283,7 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
   rs->flat.is_pit_floor = (sector->flags1 & SEC_FLAG1_PIT) != 0;
 
   // Process walls: cull, clip, project.
-  WallSegment segments[MAX_WALL_SEG];
+  WallSegment *segments = rs->seg_pool + (size_t)rs->adjoin_depth * MAX_WALL_SEG;
   int32_t seg_count = 0;
 
 #if ENGINE_FORMAT == ENGINE_FORMAT_DF
@@ -268,8 +292,8 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
   bool nowall = false;
 #endif
 
-  AdjoinList adjoin_list;
-  adjoin_list_reset(&adjoin_list);
+  AdjoinList *adjoin_list = &rs->adjoin_pool[rs->adjoin_depth];
+  adjoin_list_reset(adjoin_list);
 
   for (int32_t i = 0; i < sector->wall_count && seg_count < MAX_WALL_SEG; i++) {
     Wall *wall = &sector->walls[i];
@@ -278,8 +302,8 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     if ((rs->cull_mask & CULL_DFS_MARKING) && wall->traverse_frame == rs->draw_frame) {
       rs->cull_count_dfs++;
       if (trace && wall->next_sector)
-        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4, "wall %d (->sec %d) SKIP dfs-marked",
-                i, wall->next_sector->id);
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
+                         "wall %d (->sec %d) SKIP dfs-marked", i, wall->next_sector->id);
       continue;
     }
 
@@ -299,16 +323,18 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     if (!wall_process(&rs->camera, frustum, wall, wall_idx, floor_h, ceil_h, next_floor,
                       next_ceil, seg, rs->cull_mask)) {
       if (trace && wall->next_sector)
-        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4, "wall %d (->sec %d) CULLED by wall_process",
-                i, wall->next_sector->id);
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
+                         "wall %d (->sec %d) CULLED by wall_process", i,
+                         wall->next_sector->id);
       continue;
     }
     if (trace && wall->next_sector)
-      LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
-              "wall %d (->sec %d) PASSED  vx=[%.3f,%.3f] vz=[%.3f,%.3f] adjoin=%d "
-              "solid=%d dadjoin=%d",
-              i, wall->next_sector->id, seg->vx0, seg->vx1, seg->vz0, seg->vz1,
-              seg->is_adjoin, seg->is_solid, seg->has_dadjoin);
+      LOG_TRACE_INDENT(
+          "render", rs->adjoin_depth + 4,
+          "wall %d (->sec %d) PASSED  vx=[%.3f,%.3f] vz=[%.3f,%.3f] adjoin=%d "
+          "solid=%d dadjoin=%d",
+          i, wall->next_sector->id, seg->vx0, seg->vx1, seg->vz0, seg->vz1,
+          seg->is_adjoin, seg->is_solid, seg->has_dadjoin);
 
     // Double adjoin: override draw flags and solidity based on both openings.
     // ADJOIN/MIRROR = upper portal, DADJOIN/DMIRROR = lower portal.
@@ -352,11 +378,9 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     if ((rs->cull_mask & CULL_SBUFFER) && (seg->is_solid || !seg->is_adjoin)) {
       float proj0 = sbuffer_project(seg->vx0, seg->vz0);
       float proj1 = sbuffer_project(seg->vx1, seg->vz1);
-      SBufferSeg *sb_seg =
-          sbuffer_insert(&rs->sbuffer, proj0, proj1,
-                         seg->vx0, seg->vz0, seg->vx1, seg->vz1,
-                         seg->normal_x, seg->normal_z, seg->normal_d,
-                         wall_idx, false, wall);
+      SBufferSeg *sb_seg = sbuffer_insert(
+          &rs->sbuffer, proj0, proj1, seg->vx0, seg->vz0, seg->vx1, seg->vz1,
+          seg->normal_x, seg->normal_z, seg->normal_d, wall_idx, false, wall);
       if (!sb_seg) {
         rs->cull_count_sbuffer++;
         continue;
@@ -380,14 +404,10 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
         float mt1 = seg->t_clip1 > wall->emit_t1 ? seg->t_clip1 : wall->emit_t1;
 
         float vx0_raw, vz0_raw, vx1_raw, vz1_raw;
-        camera_transform_vertex_xz(&rs->camera,
-                                   fixed16_to_float(wall->w0->x),
-                                   fixed16_to_float(wall->w0->z),
-                                   &vx0_raw, &vz0_raw);
-        camera_transform_vertex_xz(&rs->camera,
-                                   fixed16_to_float(wall->w1->x),
-                                   fixed16_to_float(wall->w1->z),
-                                   &vx1_raw, &vz1_raw);
+        camera_transform_vertex_xz(&rs->camera, fixed16_to_float(wall->w0->x),
+                                   fixed16_to_float(wall->w0->z), &vx0_raw, &vz0_raw);
+        camera_transform_vertex_xz(&rs->camera, fixed16_to_float(wall->w1->x),
+                                   fixed16_to_float(wall->w1->z), &vx1_raw, &vz1_raw);
 
         float dx = vx1_raw - vx0_raw;
         float dz = vz1_raw - vz0_raw;
@@ -397,16 +417,14 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
         float mvz1 = vz0_raw + mt1 * dz;
 
         for (int32_t k = 0; k < wall->emit_opaque_count; k++) {
-          DisplayListEntry *e =
-              &rs->display_list.opaque[wall->emit_opaque_idx + k];
+          DisplayListEntry *e = &rs->display_list.opaque[wall->emit_opaque_idx + k];
           e->pos.v0x = mvx0;
           e->pos.v0z = mvz0;
           e->pos.v1x = mvx1;
           e->pos.v1z = mvz1;
         }
         for (int32_t k = 0; k < wall->emit_trans_count; k++) {
-          DisplayListEntry *e =
-              &rs->display_list.transparent[wall->emit_trans_idx + k];
+          DisplayListEntry *e = &rs->display_list.transparent[wall->emit_trans_idx + k];
           e->pos.v0x = mvx0;
           e->pos.v0z = mvz0;
           e->pos.v1x = mvx1;
@@ -425,21 +443,21 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
         adjoin_compute_edge_pair(rs->camera.focal_len_aspect, rs->camera.proj_offset_y,
                                  rs->camera.pos_y, floor_h, ceil_h, next_floor, next_ceil,
                                  seg, &edge);
-        adjoin_list_add(&adjoin_list, seg, &edge, wall->next_sector);
+        adjoin_list_add(adjoin_list, seg, &edge, wall->next_sector);
       } else {
         if (dadj_upper_open) {
           EdgePair edge;
           adjoin_compute_edge_pair(rs->camera.focal_len_aspect, rs->camera.proj_offset_y,
                                    rs->camera.pos_y, floor_h, ceil_h, next_floor,
                                    next_ceil, seg, &edge);
-          adjoin_list_add(&adjoin_list, seg, &edge, wall->next_sector);
+          adjoin_list_add(adjoin_list, seg, &edge, wall->next_sector);
         }
         if (dadj_lower_open) {
           EdgePair dadj_edge;
           adjoin_compute_edge_pair(rs->camera.focal_len_aspect, rs->camera.proj_offset_y,
                                    rs->camera.pos_y, floor_h, ceil_h, dadj_floor,
                                    dadj_ceil, seg, &dadj_edge);
-          adjoin_list_add(&adjoin_list, seg, &dadj_edge, wall->dadjoin_sector);
+          adjoin_list_add(adjoin_list, seg, &dadj_edge, wall->dadjoin_sector);
         }
       }
     }
@@ -456,14 +474,14 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
   // marks the sector as visited and subsequent portals are skipped, causing
   // walls visible through the wider opening to be incorrectly culled.
   bool adjoin_done[MAX_ADJOIN_SEG];
-  if (adjoin_list.count > 0)
-    memset(adjoin_done, 0, sizeof(bool) * (size_t)adjoin_list.count);
+  if (adjoin_list->count > 0)
+    memset(adjoin_done, 0, sizeof(bool) * (size_t)adjoin_list->count);
 
-  for (int32_t i = 0; i < adjoin_list.count; i++) {
+  for (int32_t i = 0; i < adjoin_list->count; i++) {
     if (adjoin_done[i])
       continue;
 
-    AdjoinEntry *ae = &adjoin_list.entries[i];
+    AdjoinEntry *ae = &adjoin_list->entries[i];
     Sector *target = ae->next_sector;
 
     // Collect portal vertices from all walls adjoining to this target sector.
@@ -476,8 +494,8 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     Wall *merged_walls[32];
     int32_t merged_wall_count = 0;
 
-    for (int32_t j = i; j < adjoin_list.count; j++) {
-      AdjoinEntry *aj = &adjoin_list.entries[j];
+    for (int32_t j = i; j < adjoin_list->count; j++) {
+      AdjoinEntry *aj = &adjoin_list->entries[j];
       if (aj->next_sector != target)
         continue;
       adjoin_done[j] = true;
@@ -497,9 +515,10 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
       float pw1x = aj->seg->vx1, pw1z = aj->seg->vz1;
 
       if (trace)
-        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
-                "portal->sec %d  clipped cam-space v0=(%.3f,%.3f) v1=(%.3f,%.3f)",
-                target->id, pw0x, pw0z, pw1x, pw1z);
+        LOG_TRACE_INDENT(
+            "render", rs->adjoin_depth + 4,
+            "portal->sec %d  clipped cam-space v0=(%.3f,%.3f) v1=(%.3f,%.3f)", target->id,
+            pw0x, pw0z, pw1x, pw1z);
 
       if (!frustum_clip_near(&pw0x, &pw0z, &pw1x, &pw1z, NEAR_PLANE_EPSILON, NULL))
         continue;
@@ -561,8 +580,9 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
       frustum_build_portal(&portal_frustum, pvx, pvz, 2);
 
       if (trace)
-        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4, "portal->sec %d  frustum planes=%d",
-                target->id, portal_frustum.plane_count);
+        LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
+                         "portal->sec %d  frustum planes=%d", target->id,
+                         portal_frustum.plane_count);
 
       frustum_stack_push(&rs->frustum_stack, &portal_frustum);
       render_draw_sector(rs, target, frustum_stack_top(&rs->frustum_stack));
@@ -570,8 +590,8 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
     } else {
       if (trace)
         LOG_TRACE_INDENT("render", rs->adjoin_depth + 4,
-                "portal->sec %d  PORTAL_FRUSTUM OFF — using parent frustum",
-                target->id);
+                         "portal->sec %d  PORTAL_FRUSTUM OFF — using parent frustum",
+                         target->id);
       render_draw_sector(rs, target, frustum);
     }
 
@@ -614,6 +634,7 @@ void render_draw_sector(RenderState *rs, Sector *sector, const Frustum *frustum)
 
 void render_draw_frame(RenderState *rs, Sector *player_sector, float eye_x, float eye_y,
                        float eye_z, Angle14 yaw, Angle14 pitch) {
+  s_sector_visits = 0;
   rs->draw_frame++;
   render_state_reset(rs);
 
