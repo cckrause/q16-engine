@@ -49,7 +49,7 @@
 #endif
 
 static const char *DEFAULT_ARCHIVE = "olgeo.lab";
-static const char *DEFAULT_LEVEL = "canyon";
+static const char *DEFAULT_LEVEL = "hideout";
 
 static bool s_running = true;
 static bool s_depth_test_overlay = false;
@@ -448,10 +448,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     Angle14 pitch_a = degrees_to_angle14(pitch_deg);
 
     LOG_INFO_INDENT("main", 2, "RENDER sec=%d pos=(%.1f,%.1f,%.1f)",
-            cam_sector ? cam_sector->id : -1, cam_x, cam_y, cam_z);
+                    cam_sector ? cam_sector->id : -1, cam_x, cam_y, cam_z);
     render_draw_frame(&rs, cam_sector, cam_x, cam_y, cam_z, yaw_a, pitch_a);
-    LOG_INFO_INDENT("main", 2, "RENDER_DONE op=%d tr=%d portals=%d", rs.display_list.opaque_count,
-            rs.display_list.transparent_count, rs.portals_traversed);
+    LOG_INFO_INDENT("main", 2, "RENDER_DONE op=%d tr=%d portals=%d",
+                    rs.display_list.opaque_count, rs.display_list.transparent_count,
+                    rs.portals_traversed);
 
     // --- Debug HUD (window title) ---
     {

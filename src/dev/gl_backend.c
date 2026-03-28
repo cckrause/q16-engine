@@ -8,6 +8,8 @@
 #include <glad/glad.h>
 #include <stddef.h>
 #include <stdio.h>
+
+#include "debug/debug_log.h"
 #include <string.h>
 
 #include <math.h>
@@ -61,7 +63,7 @@ static GLuint compile_shader(GLenum type, const char *src) {
   if (!ok) {
     char log[512];
     glGetShaderInfoLog(s, sizeof(log), NULL, log);
-    fprintf(stderr, "shader compile error: %s\n", log);
+    LOG_ERROR("gl", "shader compile error: %s", log);
     glDeleteShader(s);
     return 0;
   }
@@ -79,7 +81,7 @@ static GLuint link_program(GLuint vs, GLuint fs) {
   if (!ok) {
     char log[512];
     glGetProgramInfoLog(p, sizeof(log), NULL, log);
-    fprintf(stderr, "program link error: %s\n", log);
+    LOG_ERROR("gl", "program link error: %s", log);
     glDeleteProgram(p);
     return 0;
   }

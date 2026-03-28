@@ -28,8 +28,7 @@ static double elapsed_ms(void) {
 #ifdef _WIN32
   LARGE_INTEGER now;
   QueryPerformanceCounter(&now);
-  return (double)(now.QuadPart - s_start.QuadPart) * 1000.0 /
-         (double)s_freq.QuadPart;
+  return (double)(now.QuadPart - s_start.QuadPart) * 1000.0 / (double)s_freq.QuadPart;
 #else
   struct timeval now;
   gettimeofday(&now, NULL);
@@ -65,24 +64,25 @@ void debug_log_shutdown(void) {
   if (!s_file)
     return;
   double ms = elapsed_ms();
-  fprintf(s_file, "[%10.3f] INFO  log    | === Log End (%.1fs) ===\n",
-          ms, ms / 1000.0);
+  fprintf(s_file, "[%10.3f] INFO  log    | === Log End (%.1fs) ===\n", ms, ms / 1000.0);
   fflush(s_file);
   if (s_file != stderr)
     fclose(s_file);
   s_file = NULL;
 }
 
-void debug_log_set_level(LogLevel min_level) { s_min_level = min_level; }
+void debug_log_set_level(LogLevel min_level) {
+  s_min_level = min_level;
+}
 
 // --- Writing ---------------------------------------------------------------
 
-void debug_log_write(LogLevel level, const char *module, int32_t indent,
-                     const char *fmt, ...) {
+void debug_log_write(LogLevel level, const char *module, int32_t indent, const char *fmt,
+                     ...) {
   if (!s_file || level > s_min_level)
     return;
-  fprintf(s_file, "[%10.3f] %s %-6s | %*s", elapsed_ms(),
-          s_level_tags[level], module, indent * 2, "");
+  fprintf(s_file, "[%10.3f] %s %-6s | %*s", elapsed_ms(), s_level_tags[level], module,
+          indent * 2, "");
   va_list args;
   va_start(args, fmt);
   vfprintf(s_file, fmt, args);
@@ -91,4 +91,6 @@ void debug_log_write(LogLevel level, const char *module, int32_t indent,
   fflush(s_file);
 }
 
-bool debug_log_is_active(void) { return s_file != NULL; }
+bool debug_log_is_active(void) {
+  return s_file != NULL;
+}

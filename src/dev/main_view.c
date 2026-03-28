@@ -12,7 +12,7 @@
 //   C         — cycle color mode (part / sector / depth)
 //   PgUp/PgDn — adjust max portal depth
 //   M         — toggle minimap
-//   L         — one-frame portal trace to stderr
+//   L         — one-frame portal trace
 //   1-7       — toggle culling stages (backface/frustum/sbuffer/dfs/budget/fclip/portal)
 //   0         — reset all culling stages to ON
 //   Escape    — quit
@@ -34,6 +34,7 @@
 #include "view_input.h"
 
 #include "archive/archive.h"
+#include "debug/debug_log.h"
 #include "io/stream.h"
 #include "math/core_math.h"
 #include "memory/game_memory.h"
@@ -60,11 +61,12 @@ int main(int argc, char *argv[]) {
   const char *archive_path = (argc > 1) ? argv[1] : DEFAULT_ARCHIVE;
   const char *level_name = (argc > 2) ? argv[2] : DEFAULT_LEVEL;
 
-  // Detect standalone .LEV/.LVT file (bypass archive).
   bool standalone =
       str_ends_with_nocase(archive_path, ".lev") || str_ends_with_nocase(archive_path, ".lvt");
 
   game_memory_init();
+  debug_log_init(NULL);
+  LOG_INFO("view", "INIT archive=%s level=%s", archive_path, level_name);
 
   LevelState state;
   memset(&state, 0, sizeof(state));
@@ -73,7 +75,8 @@ int main(int argc, char *argv[]) {
   if (standalone) {
     StreamReader sr = stream_from_file(archive_path);
     if (!sr.read) {
-      fprintf(stderr, "ERROR: failed to open '%s'\n", archive_path);
+      LOG_ERROR("view", "failed to open '%s'", archive_path);
+      debug_log_shutdown();
       game_memory_shutdown();
       return 1;
     }
@@ -82,7 +85,8 @@ int main(int argc, char *argv[]) {
   } else {
     Archive *ar = archive_open(archive_path);
     if (!ar) {
-      fprintf(stderr, "ERROR: failed to open archive '%s'\n", archive_path);
+      LOG_ERROR("view", "failed to open archive '%s'", archive_path);
+      debug_log_shutdown();
       game_memory_shutdown();
       return 1;
     }
@@ -92,17 +96,19 @@ int main(int argc, char *argv[]) {
     if (!archive_file_exists(ar, filename)) {
       snprintf(filename, sizeof(filename), "%s.LVT", level_name);
       if (!archive_file_exists(ar, filename)) {
-        fprintf(stderr, "ERROR: neither '%s.LEV' nor '%s.LVT' found in archive\n",
-                level_name, level_name);
+        LOG_ERROR("view", "neither '%s.LEV' nor '%s.LVT' found in archive",
+               level_name, level_name);
         archive_close(ar);
+        debug_log_shutdown();
         game_memory_shutdown();
         return 1;
       }
     }
 
     if (!archive_open_file(ar, filename)) {
-      fprintf(stderr, "ERROR: failed to open '%s' in archive\n", filename);
+      LOG_ERROR("view", "failed to open '%s' in archive", filename);
       archive_close(ar);
+      debug_log_shutdown();
       game_memory_shutdown();
       return 1;
     }
@@ -114,19 +120,21 @@ int main(int argc, char *argv[]) {
   }
 
   if (!ok) {
-    fprintf(stderr, "ERROR: failed to parse '%s'\n", archive_path);
+    LOG_ERROR("view", "failed to parse '%s'", archive_path);
     game_level_clear();
+    debug_log_shutdown();
     game_memory_shutdown();
     return 1;
   }
 
-  printf("loaded: %s — %d sectors, %d walls, %d vertices\n", state.level_name,
-         state.sector_count, state.wall_count, state.vertex_count);
+  LOG_INFO("view", "LEVEL_OK %s — %d sectors, %d walls, %d vertices",
+         state.level_name, state.sector_count, state.wall_count, state.vertex_count);
 
   // SDL + OpenGL init.
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-    fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
+    LOG_ERROR("view", "SDL_Init: %s", SDL_GetError());
     game_level_clear();
+    debug_log_shutdown();
     game_memory_shutdown();
     return 1;
   }
@@ -143,45 +151,49 @@ int main(int argc, char *argv[]) {
       SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
 
   if (!window) {
-    fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
+    LOG_ERROR("view", "SDL_CreateWindow: %s", SDL_GetError());
     SDL_Quit();
     game_level_clear();
+    debug_log_shutdown();
     game_memory_shutdown();
     return 1;
   }
 
   SDL_GLContext gl_ctx = SDL_GL_CreateContext(window);
   if (!gl_ctx) {
-    fprintf(stderr, "SDL_GL_CreateContext: %s\n", SDL_GetError());
+    LOG_ERROR("view", "SDL_GL_CreateContext: %s", SDL_GetError());
     SDL_DestroyWindow(window);
     SDL_Quit();
     game_level_clear();
+    debug_log_shutdown();
     game_memory_shutdown();
     return 1;
   }
 
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
-    fprintf(stderr, "gladLoadGLLoader failed\n");
+    LOG_ERROR("view", "gladLoadGLLoader failed");
     SDL_GL_DeleteContext(gl_ctx);
     SDL_DestroyWindow(window);
     SDL_Quit();
     game_level_clear();
+    debug_log_shutdown();
     game_memory_shutdown();
     return 1;
   }
 
-  printf("OpenGL %s, %s\n", glGetString(GL_VERSION), glGetString(GL_RENDERER));
+  LOG_INFO("view", "OpenGL %s, %s", glGetString(GL_VERSION), glGetString(GL_RENDERER));
 
   SDL_GL_SetSwapInterval(1);
 
   // Init render state.
   RenderState rs;
   if (!render_state_init(&rs, WINDOW_W, WINDOW_H, MAX_ADJOIN_DEPTH)) {
-    fprintf(stderr, "render_state_init failed\n");
+    LOG_ERROR("view", "render_state_init failed");
     SDL_GL_DeleteContext(gl_ctx);
     SDL_DestroyWindow(window);
     SDL_Quit();
     game_level_clear();
+    debug_log_shutdown();
     game_memory_shutdown();
     return 1;
   }
@@ -195,12 +207,13 @@ int main(int argc, char *argv[]) {
 
   GlBackend gl;
   if (!gl_backend_init(&gl, MAX_DISP_ITEMS)) {
-    fprintf(stderr, "gl_backend_init failed\n");
+    LOG_ERROR("view", "gl_backend_init failed");
     render_state_destroy(&rs);
     SDL_GL_DeleteContext(gl_ctx);
     SDL_DestroyWindow(window);
     SDL_Quit();
     game_level_clear();
+    debug_log_shutdown();
     game_memory_shutdown();
     return 1;
   }
@@ -220,6 +233,8 @@ int main(int argc, char *argv[]) {
   view_input_init(&vi, init_x, init_y, init_z);
 
   SDL_SetRelativeMouseMode(SDL_TRUE);
+
+  LOG_INFO("view", "INIT_COMPLETE");
 
   Uint64 last_time = SDL_GetPerformanceCounter();
   Uint64 freq = SDL_GetPerformanceFrequency();
@@ -244,24 +259,24 @@ int main(int argc, char *argv[]) {
         rs.max_adjoin_depth = MAX_ADJOIN_DEPTH;
       if (rs.max_adjoin_depth < 0)
         rs.max_adjoin_depth = 0;
-      fprintf(stderr, "adjoin depth: %d\n", rs.max_adjoin_depth);
+      LOG_INFO("view", "adjoin depth: %d", rs.max_adjoin_depth);
     }
     if (acts.cull_toggle) {
       rs.cull_mask ^= acts.cull_toggle;
-      fprintf(stderr,
-              "[cull] 1:bface=%s 2:ftest=%s 3:sbuf=%s 4:dfs=%s 5:budg=%s "
-              "6:fclip=%s 7:pfrust=%s\n",
-              (rs.cull_mask & CULL_BACKFACE) ? "ON" : "off",
-              (rs.cull_mask & CULL_FRUSTUM) ? "ON" : "off",
-              (rs.cull_mask & CULL_SBUFFER) ? "ON" : "off",
-              (rs.cull_mask & CULL_DFS_MARKING) ? "ON" : "off",
-              (rs.cull_mask & CULL_PORTAL_BUDGET) ? "ON" : "off",
-              (rs.cull_mask & CULL_FRUSTUM_CLIP) ? "ON" : "off",
-              (rs.cull_mask & CULL_PORTAL_FRUSTUM) ? "ON" : "off");
+      LOG_INFO("view",
+             "[cull] 1:bface=%s 2:ftest=%s 3:sbuf=%s 4:dfs=%s 5:budg=%s "
+             "6:fclip=%s 7:pfrust=%s",
+             (rs.cull_mask & CULL_BACKFACE) ? "ON" : "off",
+             (rs.cull_mask & CULL_FRUSTUM) ? "ON" : "off",
+             (rs.cull_mask & CULL_SBUFFER) ? "ON" : "off",
+             (rs.cull_mask & CULL_DFS_MARKING) ? "ON" : "off",
+             (rs.cull_mask & CULL_PORTAL_BUDGET) ? "ON" : "off",
+             (rs.cull_mask & CULL_FRUSTUM_CLIP) ? "ON" : "off",
+             (rs.cull_mask & CULL_PORTAL_FRUSTUM) ? "ON" : "off");
     }
     if (acts.cull_reset) {
       rs.cull_mask = CULL_ALL;
-      fprintf(stderr, "[cull] RESET — all stages ON\n");
+      LOG_INFO("view", "[cull] RESET — all stages ON");
     }
 
     Sector *cam_sector = sector_find_at(&state, float_to_fixed16(vi.cam_x),
@@ -272,29 +287,30 @@ int main(int argc, char *argv[]) {
 
     // Run CPU render pipeline.
     if (rs.debug_trace)
-      fprintf(stderr, "\n=== TRACE FRAME  sec=%d  yaw=%.1f  cam=(%.2f,%.2f,%.2f) ===\n",
-              cam_sector->id, vi.yaw_deg, vi.cam_x, vi.cam_y, vi.cam_z);
+      LOG_INFO("view", "=== TRACE FRAME  sec=%d  yaw=%.1f  cam=(%.2f,%.2f,%.2f) ===",
+             cam_sector->id, vi.yaw_deg, vi.cam_x, vi.cam_y, vi.cam_z);
     render_draw_frame(&rs, cam_sector, vi.cam_x, vi.cam_y, vi.cam_z, yaw_a, pitch_a);
     if (rs.debug_trace) {
-      fprintf(stderr, "=== END TRACE  opaque=%d ===\n\n", rs.display_list.opaque_count);
+      LOG_INFO("view", "=== END TRACE  opaque=%d ===", rs.display_list.opaque_count);
       rs.debug_trace = false;
     }
     static int frame_count = 0;
     static int prev_sector_id = -1;
     if (cam_sector->id != prev_sector_id) {
-      fprintf(stderr,
-              "[frame %d] SECTOR CHANGE %d -> %d  opaque=%d cam=(%.1f,%.1f,%.1f)\n",
-              frame_count, prev_sector_id, cam_sector->id, rs.display_list.opaque_count,
-              vi.cam_x, vi.cam_y, vi.cam_z);
+      LOG_INFO("view", "[frame %d] SECTOR CHANGE %d -> %d  opaque=%d cam=(%.1f,%.1f,%.1f)",
+             frame_count, prev_sector_id, cam_sector->id, rs.display_list.opaque_count,
+             vi.cam_x, vi.cam_y, vi.cam_z);
       prev_sector_id = cam_sector->id;
     } else if (frame_count % 120 == 0) {
-      fprintf(stderr, "[frame %d] sector=%d opaque=%d depth=%d cam=(%.1f,%.1f,%.1f)",
-              frame_count, cam_sector->id, rs.display_list.opaque_count,
-              rs.max_adjoin_depth, vi.cam_x, vi.cam_y, vi.cam_z);
+      char buf[256];
+      int len = snprintf(buf, sizeof(buf),
+                         "[frame %d] sector=%d opaque=%d depth=%d cam=(%.1f,%.1f,%.1f)",
+                         frame_count, cam_sector->id, rs.display_list.opaque_count,
+                         rs.max_adjoin_depth, vi.cam_x, vi.cam_y, vi.cam_z);
       if (rs.cull_count_sbuffer || rs.cull_count_dfs || rs.cull_count_budget)
-        fprintf(stderr, "  culled: sbuf=%d dfs=%d budget=%d",
-                rs.cull_count_sbuffer, rs.cull_count_dfs, rs.cull_count_budget);
-      fprintf(stderr, "\n");
+        snprintf(buf + len, sizeof(buf) - (size_t)len, "  culled: sbuf=%d dfs=%d budget=%d",
+                 rs.cull_count_sbuffer, rs.cull_count_dfs, rs.cull_count_budget);
+      LOG_INFO("view", "%s", buf);
     }
     frame_count++;
 
@@ -319,6 +335,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Cleanup.
+  LOG_INFO("view", "SHUTDOWN");
   free(visited_buf);
   gl_backend_destroy(&gl);
   render_state_destroy(&rs);
@@ -326,6 +343,7 @@ int main(int argc, char *argv[]) {
   SDL_DestroyWindow(window);
   SDL_Quit();
   game_level_clear();
+  debug_log_shutdown();
   game_memory_shutdown();
 
   return 0;
